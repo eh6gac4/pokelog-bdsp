@@ -1,0 +1,188 @@
+import { render, screen, within, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { PartyMemberCard } from "./PartyMemberCard";
+import { NATURES, PartyMember } from "@/types/party";
+
+function makeMember(partial: Partial<PartyMember> = {}): PartyMember {
+  return {
+    id: "m1",
+    speciesId: 393,
+    speciesName: "ポッチャマ",
+    nickname: "",
+    level: 5,
+    nature: "",
+    ability: "",
+    heldItem: "",
+    ...partial,
+  };
+}
+
+describe("PartyMemberCard", () => {
+  it("expand/collapse toggle", async () => {
+    const user = userEvent.setup();
+    render(
+      <PartyMemberCard
+        member={makeMember()}
+        abilitySuggestions={[]}
+        heldItemSuggestions={[]}
+        onUpdate={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+    expect(screen.getByText("▼")).toBeInTheDocument();
+    expect(screen.queryByText("種族名")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button"));
+    expect(screen.getByText("種族名")).toBeInTheDocument();
+    expect(screen.getByText("▲")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /ポッチャマ/ }));
+    expect(screen.queryByText("種族名")).not.toBeInTheDocument();
+  });
+
+  it("display name logic", () => {
+    const { rerender } = render(
+      <PartyMemberCard
+        member={makeMember({ nickname: "ぽち", speciesName: "ポッチャマ" })}
+        abilitySuggestions={[]}
+        heldItemSuggestions={[]}
+        onUpdate={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+    expect(screen.getByText("ぽち（ポッチャマ）")).toBeInTheDocument();
+
+    rerender(
+      <PartyMemberCard
+        member={makeMember({ nickname: "", speciesName: "ヒコザル" })}
+        abilitySuggestions={[]}
+        heldItemSuggestions={[]}
+        onUpdate={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+    expect(screen.getByText("ヒコザル")).toBeInTheDocument();
+
+    rerender(
+      <PartyMemberCard
+        member={makeMember({ nickname: "", speciesName: "" })}
+        abilitySuggestions={[]}
+        heldItemSuggestions={[]}
+        onUpdate={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+    expect(screen.getByText("不明")).toBeInTheDocument();
+  });
+
+  it("nature select has 26 options (未設定 + 25 NATURES) and fires onUpdate", async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    const { container } = render(
+      <PartyMemberCard
+        member={makeMember()}
+        abilitySuggestions={[]}
+        heldItemSuggestions={[]}
+        onUpdate={onUpdate}
+        onRemove={() => {}}
+      />,
+    );
+    await user.click(within(container).getByRole("button"));
+    // inputs with `list` also expose role combobox, so target the <select>
+    const select = container.querySelector("select") as HTMLSelectElement;
+    const options = within(select).getAllByRole("option");
+    expect(options).toHaveLength(NATURES.length + 1);
+    expect(options).toHaveLength(26);
+    expect(options[0]).toHaveTextContent("未設定");
+    expect(options[0]).toHaveValue("");
+
+    await user.selectOptions(select, NATURES[0]);
+    expect(onUpdate).toHaveBeenLastCalledWith("m1", { nature: NATURES[0] });
+  });
+
+  it("ability/heldItem inputs reference per-member datalists with rendered options", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <PartyMemberCard
+        member={makeMember()}
+        abilitySuggestions={["げきりゅう", "するどいめ"]}
+        heldItemSuggestions={["きあいのタスキ", "たべのこし"]}
+        onUpdate={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+    await user.click(screen.getByRole("button"));
+
+    const abilityList = container.querySelector("#ability-list-m1");
+    const heldList = container.querySelector("#held-item-list-m1");
+    expect(abilityList).not.toBeNull();
+    expect(heldList).not.toBeNull();
+    expect(abilityList!.querySelectorAll("option")).toHaveLength(2);
+    expect(heldList!.querySelectorAll("option")).toHaveLength(2);
+
+    const inputs = container.querySelectorAll("input[list]");
+    const lists = Array.from(inputs).map((i) => i.getAttribute("list"));
+    expect(lists).toContain("ability-list-m1");
+    expect(lists).toContain("held-item-list-m1");
+  });
+
+  it("editing fields fires onUpdate with Number coercion for speciesId/level", async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <PartyMemberCard
+        member={makeMember()}
+        abilitySuggestions={["げきりゅう"]}
+        heldItemSuggestions={["たべのこし"]}
+        onUpdate={onUpdate}
+        onRemove={() => {}}
+      />,
+    );
+    await user.click(screen.getByRole("button"));
+
+    await user.type(screen.getByDisplayValue("ポッチャマ"), "X");
+    expect(onUpdate).toHaveBeenLastCalledWith("m1", { speciesName: "ポッチャマX" });
+
+    // speciesId input value is "" (393? no, 393 -> "393"). Use placeholder-free
+    // approach: speciesId shows "393", level shows "5".
+    // Parent never re-renders with new props; use fireEvent.change for a
+    // deterministic single onChange with the final value.
+    const idInput = screen.getByDisplayValue("393");
+    fireEvent.change(idInput, { target: { value: "25" } });
+    expect(onUpdate).toHaveBeenLastCalledWith("m1", { speciesId: 25 });
+    expect(typeof onUpdate.mock.calls.at(-1)![1].speciesId).toBe("number");
+
+    const levelInput = screen.getByDisplayValue("5");
+    fireEvent.change(levelInput, { target: { value: "8" } });
+    expect(onUpdate).toHaveBeenLastCalledWith("m1", { level: 8 });
+    expect(typeof onUpdate.mock.calls.at(-1)![1].level).toBe("number");
+
+    // ability and heldItem both empty; target by list attr
+    const abilityEl = document.querySelector(
+      "input[list='ability-list-m1']",
+    ) as HTMLInputElement;
+    await user.type(abilityEl, "げ");
+    expect(onUpdate).toHaveBeenLastCalledWith("m1", { ability: "げ" });
+
+    const heldEl = document.querySelector(
+      "input[list='held-item-list-m1']",
+    ) as HTMLInputElement;
+    await user.type(heldEl, "た");
+    expect(onUpdate).toHaveBeenLastCalledWith("m1", { heldItem: "た" });
+  });
+
+  it("delete calls onRemove(id)", async () => {
+    const user = userEvent.setup();
+    const onRemove = vi.fn();
+    render(
+      <PartyMemberCard
+        member={makeMember()}
+        abilitySuggestions={[]}
+        heldItemSuggestions={[]}
+        onUpdate={() => {}}
+        onRemove={onRemove}
+      />,
+    );
+    await user.click(screen.getByRole("button"));
+    await user.click(screen.getByRole("button", { name: "削除" }));
+    expect(onRemove).toHaveBeenCalledWith("m1");
+  });
+});
