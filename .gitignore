@@ -12,6 +12,13 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
+
+# claude code (local-only settings)
+.claude/settings.local.json
 
 # next.js
 /.next/

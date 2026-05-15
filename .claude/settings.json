@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s * http://localhost:*)",
+      "Bash(ss -tlnp*)",
+      "Bash(npx eslint *)",
+      "Bash(npm run build)",
+      "Bash(npm run dev)",
+      "Bash(npm run lint)",
+      "Bash(curl *)",
+      "Bash(cp *)",
+      "Bash(mkdir *)",
+      "Bash(rm *)",
+      "Bash(rmdir *)",
+      "Bash(unzip *)"
+    ]
+  }
+}

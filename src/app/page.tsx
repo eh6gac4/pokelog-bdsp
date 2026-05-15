@@ -1,65 +1,158 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { useParty } from "@/hooks/useParty";
+import { usePokemonLog } from "@/hooks/usePokemonLog";
+import {
+  GAME_VERSIONS,
+  GAME_VERSION_LABELS,
+  GameVersion,
+  PARTY_MAX_MEMBERS,
+} from "@/types/party";
+import { PartyMemberCard } from "@/components/party/PartyMemberCard";
+import { AddPartyMemberModal } from "@/components/party/AddPartyMemberModal";
+
+export default function PartyPage() {
+  const {
+    party,
+    hydrated,
+    updateParty,
+    addMember,
+    updateMember,
+    removeMember,
+    resetParty,
+  } = useParty();
+  const { entries: logEntries, hydrated: logHydrated } = usePokemonLog();
+  const [showModal, setShowModal] = useState(false);
+
+  const abilitySuggestions = useMemo(
+    () =>
+      Array.from(
+        new Set(party.members.map((m) => m.ability).filter(Boolean))
+      ),
+    [party.members]
+  );
+  const heldItemSuggestions = useMemo(
+    () =>
+      Array.from(
+        new Set(party.members.map((m) => m.heldItem).filter(Boolean))
+      ),
+    [party.members]
+  );
+
+  if (!hydrated || !logHydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-gray-400 dark:text-gray-500">
+        読み込み中...
+      </div>
+    );
+  }
+
+  const handleReset = () => {
+    if (party.members.length === 0 && !party.name) {
+      resetParty();
+      return;
+    }
+    if (window.confirm("旅パをリセットしますか？")) {
+      resetParty();
+    }
+  };
+
+  const canAdd = party.members.length < PARTY_MAX_MEMBERS;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="mx-auto max-w-xl px-4 py-8">
+      <header className="mb-6">
+        <Link
+          href="/ev"
+          className="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+        >
+          ← 努力値ログ
+        </Link>
+        <div className="mt-2 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">旅パ</h1>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {party.members.length} / {PARTY_MAX_MEMBERS} 体
+            </p>
+          </div>
+          <button
+            onClick={handleReset}
+            className="text-xs text-gray-400 hover:text-red-500"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            リセット
+          </button>
+        </div>
+      </header>
+
+      <section className="mb-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 space-y-3">
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-gray-500">パーティ名</span>
+          <input
+            className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+            value={party.name}
+            onChange={(e) => updateParty({ name: e.target.value })}
+            placeholder="旅パ名"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-gray-500">バージョン</span>
+          <select
+            className="rounded border border-gray-200 dark:border-gray-600 px-2 py-1 bg-white dark:bg-gray-700 dark:text-gray-100"
+            value={party.version}
+            onChange={(e) =>
+              updateParty({ version: e.target.value as GameVersion })
+            }
+          >
+            {GAME_VERSIONS.map((v) => (
+              <option key={v} value={v}>
+                {GAME_VERSION_LABELS[v]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
+      {party.members.length === 0 ? (
+        <div className="rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 py-12 text-center text-gray-400 dark:text-gray-500">
+          <p className="text-4xl mb-3">🎒</p>
+          <p className="font-medium">メンバー未登録</p>
+          <p className="text-sm mt-1">下の「+ メンバー追加」から登録</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {party.members.map((member) => (
+            <PartyMemberCard
+              key={member.id}
+              member={member}
+              abilitySuggestions={abilitySuggestions}
+              heldItemSuggestions={heldItemSuggestions}
+              onUpdate={updateMember}
+              onRemove={removeMember}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          ))}
         </div>
-      </main>
+      )}
+
+      {canAdd && (
+        <button
+          onClick={() => setShowModal(true)}
+          className="mt-4 w-full rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 py-3 text-sm text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-colors"
+        >
+          + メンバー追加
+        </button>
+      )}
+
+      {showModal && (
+        <AddPartyMemberModal
+          logEntries={logEntries}
+          abilitySuggestions={abilitySuggestions}
+          heldItemSuggestions={heldItemSuggestions}
+          onAdd={addMember}
+          onClose={() => setShowModal(false)}
+        />
+      )}
     </div>
   );
 }
