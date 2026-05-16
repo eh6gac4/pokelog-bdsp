@@ -13,6 +13,8 @@ import {
 } from "@/types/party";
 import { PartyMemberCard } from "@/components/party/PartyMemberCard";
 import { AddPartyMemberModal } from "@/components/party/AddPartyMemberModal";
+import { SyncSettings } from "@/components/SyncSettings";
+import { syncConfigured } from "@/lib/sync";
 
 export default function PartyPage() {
   const {
@@ -26,6 +28,8 @@ export default function PartyPage() {
   } = useParty();
   const { entries: logEntries, hydrated: logHydrated } = usePokemonLog();
   const [showModal, setShowModal] = useState(false);
+  const [showSync, setShowSync] = useState(false);
+  const syncEnabled = syncConfigured();
 
   const abilitySuggestions = useMemo(
     () =>
@@ -78,12 +82,22 @@ export default function PartyPage() {
               {party.members.length} / {PARTY_MAX_MEMBERS} 体
             </p>
           </div>
-          <button
-            onClick={handleReset}
-            className="text-xs text-gray-400 hover:text-red-500"
-          >
-            リセット
-          </button>
+          <div className="flex items-center gap-3">
+            {syncEnabled && (
+              <button
+                onClick={() => setShowSync(true)}
+                className="text-xs text-gray-400 hover:text-blue-500"
+              >
+                同期
+              </button>
+            )}
+            <button
+              onClick={handleReset}
+              className="text-xs text-gray-400 hover:text-red-500"
+            >
+              リセット
+            </button>
+          </div>
         </div>
       </header>
 
@@ -154,6 +168,8 @@ export default function PartyPage() {
           onClose={() => setShowModal(false)}
         />
       )}
+
+      {showSync && <SyncSettings onClose={() => setShowSync(false)} />}
     </div>
   );
 }

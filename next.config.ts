@@ -6,6 +6,12 @@ const nextConfig: NextConfig = {
     root: path.resolve(__dirname),
   },
   allowedDevOrigins: ["192.168.1.253"],
+  // 同期 Worker URL（秘密ではない。認証は同期コード）。.env* は gitignore
+  // のためここで baked-in しどの環境でも有効化する。
+  env: {
+    NEXT_PUBLIC_SYNC_URL:
+      "https://pokelog-bdsp-sync.toshiki-cho-dev.workers.dev",
+  },
   async headers() {
     return [
       {

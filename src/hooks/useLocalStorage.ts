@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { markChanged } from "@/lib/sync";
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
   const [value, setValue] = useState<T>(initialValue);
@@ -21,6 +22,8 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
       const next = typeof v === "function" ? (v as (p: T) => T)(prev) : v;
       try {
         localStorage.setItem(key, JSON.stringify(next));
+        // データ変更を同期層に通知（SyncManager がデバウンス push）。
+        markChanged();
       } catch {
         // ignore storage errors
       }
