@@ -1,0 +1,43 @@
+name: Deploy to Cloudflare Pages
+
+# main へ push/マージで本番デプロイ。手動実行も可。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 同時デプロイの競合を防ぐ（最新のみ）。
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # 壊れた main をデプロイしないための単体テストゲート。
+      - run: npm run test
+
+      # output:"export" → out/ に静的書き出し。
+      - run: npm run build
+
+      - name: Deploy out/ to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            pages deploy out
+            --project-name pokelog-bdsp
+            --branch main

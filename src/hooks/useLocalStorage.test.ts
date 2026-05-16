@@ -1,5 +1,6 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useLocalStorage } from "./useLocalStorage";
+import { CHANGE_EVENT, DIRTY_KEY } from "@/lib/sync";
 
 describe("useLocalStorage", () => {
   it("starts with the initial value and hydrates to true", async () => {
@@ -65,6 +66,21 @@ describe("useLocalStorage", () => {
 
     expect(result.current[0]).toBe(15);
     expect(JSON.parse(localStorage.getItem("k-upd")!)).toBe(15);
+  });
+
+  it("set() は変更を同期層へ通知する（イベント＋dirty）", async () => {
+    const { result } = renderHook(() => useLocalStorage("k-sync", 0));
+    await waitFor(() => expect(result.current[2]).toBe(true));
+
+    const fired = vi.fn();
+    window.addEventListener(CHANGE_EVENT, fired);
+    act(() => {
+      result.current[1](1);
+    });
+    window.removeEventListener(CHANGE_EVENT, fired);
+
+    expect(fired).toHaveBeenCalled();
+    expect(localStorage.getItem(DIRTY_KEY)).toBe("1");
   });
 
   it("keeps two different keys independent", async () => {

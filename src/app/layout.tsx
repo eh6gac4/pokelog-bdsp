@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { SyncManager } from "@/components/SyncManager";
 import "./globals.css";
 
 const k8x12s = localFont({
@@ -39,6 +40,7 @@ export default function RootLayout({
     <html lang="ja" className={`h-full ${k8x12s.variable}`}>
       <body className={`${k8x12s.className} min-h-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
         <ServiceWorkerRegister />
+        <SyncManager />
         {children}
       </body>
     </html>

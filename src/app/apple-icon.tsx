@@ -2,6 +2,8 @@ import { ImageResponse } from "next/og";
 
 // iOS ホーム画面アイコン（apple-touch-icon を自動生成）。
 // iOS は角丸/光沢を自前処理するため背景は不透明・正方形フルブリード。
+// output:"export" でビルド時に静的 PNG として書き出す。
+export const dynamic = "force-static";
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 

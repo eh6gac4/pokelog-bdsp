@@ -1,5 +1,8 @@
 import type { MetadataRoute } from "next";
 
+// output:"export" でビルド時に静的 manifest.webmanifest として書き出す。
+export const dynamic = "force-static";
+
 // Web App Manifest（App Router のファイル規約）。
 // Next が自動で <link rel="manifest" href="/manifest.webmanifest"> を注入する。
 export default function manifest(): MetadataRoute.Manifest {
