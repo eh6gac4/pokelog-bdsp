@@ -17,9 +17,9 @@ export interface UseSync {
   code: string | null;
   busy: boolean;
   lastStatus: SyncStatus | null;
-  /** 新しいコードを生成して接続（この端末の内容を初期データにする）。 */
+  /** 強いランダム合言葉を生成して接続（この端末の内容を初期データに）。 */
   createAndConnect: () => Promise<void>;
-  /** 別端末のコードを入力して接続（サーバ内容を取り込む）。 */
+  /** 任意の合言葉で接続（既存あれば取り込み／無ければローカルを push）。 */
   connect: (code: string) => Promise<SyncStatus>;
   disconnect: () => void;
   syncNow: () => Promise<void>;

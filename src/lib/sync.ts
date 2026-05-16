@@ -1,9 +1,12 @@
 // ローカル優先のクロスデバイス同期。localStorage が真実の源で、
 // サーバ（Cloudflare Worker）は JSON スナップショット 1 件の保管庫。
-// 同期コードが唯一の認証情報（高エントロピー・共有秘密）。
+// 同期コード（任意の合言葉）が唯一の認証情報＝共有秘密。
+// 生の合言葉はサーバへ送らず、SHA-256→base64url(43文字) の「転送キー」
+// だけを送る（生合言葉は端末外に出ない）。
 
 import type { Party } from "@/types/party";
 import type { PokemonEntry } from "@/types/pokemon";
+import { sha256Bytes, base64url } from "@/lib/sha256";
 
 // useParty / usePokemonLog と同じ localStorage キー。
 export const PARTY_KEY = "pokelog-bdsp-party-v1";
@@ -34,13 +37,50 @@ export function syncConfigured(): boolean {
   return baseUrl().length > 0;
 }
 
-// 紛らわしい文字（0/O/1/I/l）を除いた 31 文字。Worker 側の
-// `^[A-Za-z0-9_-]{20,64}$` を満たす。
+// 紛らわしい文字（0/O/1/I/l）を除いた 31 文字。生成時に使う。
+// 生成物も任意合言葉と同様に転送キーへハッシュされる。
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-export const SYNC_CODE_RE = /^[A-Za-z0-9_-]{20,64}$/;
 
+export const SYNC_CODE_MIN = 12;
+export const SYNC_CODE_MAX = 256;
+
+/** 視覚的に同一の入力・前後空白を吸収（大文字小文字は区別＝保持）。 */
+export function normalizeSyncCode(raw: string): string {
+  return raw.normalize("NFC").trim();
+}
+
+/** 任意の合言葉として妥当か（正規化後 12〜256 文字）。 */
 export function isValidSyncCode(code: string): boolean {
-  return SYNC_CODE_RE.test(code);
+  const n = normalizeSyncCode(code);
+  return n.length >= SYNC_CODE_MIN && n.length <= SYNC_CODE_MAX;
+}
+
+/**
+ * 弱い合言葉の非ブロック警告用ヒューリスティック。
+ * 長さを主指標にする（日本語のみでも十分長ければ可）。
+ * - 20 文字以上: ok
+ * - 16 文字未満: weak
+ * - 16〜19 文字: 文字種が 2 種以上なら ok（英小のみ等は weak）
+ */
+export function syncCodeStrength(code: string): "weak" | "ok" {
+  const n = normalizeSyncCode(code);
+  if (n.length >= 20) return "ok";
+  if (n.length < 16) return "weak";
+  let classes = 0;
+  if (/[a-z]/.test(n)) classes++;
+  if (/[A-Z]/.test(n)) classes++;
+  if (/[0-9]/.test(n)) classes++;
+  if (/[^A-Za-z0-9]/.test(n)) classes++; // 記号・日本語等
+  return classes >= 2 ? "ok" : "weak";
+}
+
+/**
+ * 合言葉→転送キー（全端末・全環境で決定的に同一）。
+ * SHA-256(正規化済み UTF-8) を base64url 化＝43 文字、URL 安全。
+ * 既存 Worker 正規表現 `^[A-Za-z0-9_-]{20,64}$` を満たすため Worker は無改修。
+ */
+export function deriveSyncKey(rawCode: string): string {
+  return base64url(sha256Bytes(normalizeSyncCode(rawCode)));
 }
 
 export function generateSyncCode(len = 24): string {
@@ -166,7 +206,8 @@ export function markChanged(): void {
 }
 
 function endpoint(code: string): string {
-  return `${baseUrl()}/v1/sync/${encodeURIComponent(code)}`;
+  // 生合言葉ではなく決定的な転送キー（URL 安全 43 文字）を送る。
+  return `${baseUrl()}/v1/sync/${deriveSyncKey(code)}`;
 }
 
 export async function pull(code: string): Promise<Snapshot | null> {
@@ -324,10 +365,12 @@ export async function connectWithCode(code: string): Promise<SyncOutcome> {
   if (!isValidSyncCode(code)) {
     return { status: "error", error: new Error("invalid_code") };
   }
-  setSyncCode(code);
+  // 表示・コピー時に他端末と一致するよう正規化形で保存（鍵導出も同形）。
+  const normalized = normalizeSyncCode(code);
+  setSyncCode(normalized);
   let remote: Snapshot | null;
   try {
-    remote = await pull(code);
+    remote = await pull(normalized);
   } catch (error) {
     return { status: "error", error };
   }
@@ -338,7 +381,7 @@ export async function connectWithCode(code: string): Promise<SyncOutcome> {
   }
   try {
     const local = buildSnapshot();
-    await push(code, local, null);
+    await push(normalized, local, null);
     setSyncBase(local.updatedAt);
     clearDirty();
     return { status: "pushed" };

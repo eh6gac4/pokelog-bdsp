@@ -1,15 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  SYNC_CODE_RE,
   CHANGE_EVENT,
   PARTY_KEY,
   LOG_KEY,
   DIRTY_KEY,
   SYNC_BASE_KEY,
   SYNC_CODE_KEY,
+  SYNC_CODE_MIN,
   isDirty,
   generateSyncCode,
   isValidSyncCode,
+  normalizeSyncCode,
+  syncCodeStrength,
+  deriveSyncKey,
   buildSnapshot,
   applySnapshot,
   markChanged,
@@ -48,18 +51,51 @@ afterEach(() => {
 });
 
 describe("sync code", () => {
-  it("generateSyncCode は規定の正規表現を満たす", () => {
+  it("generateSyncCode は 24 文字で有効", () => {
     for (let i = 0; i < 50; i++) {
       const c = generateSyncCode();
       expect(c).toHaveLength(24);
-      expect(SYNC_CODE_RE.test(c)).toBe(true);
       expect(isValidSyncCode(c)).toBe(true);
     }
   });
-  it("isValidSyncCode は短すぎ/不正文字を弾く", () => {
-    expect(isValidSyncCode("short")).toBe(false);
-    expect(isValidSyncCode("あ".repeat(24))).toBe(false);
-    expect(isValidSyncCode("A".repeat(20))).toBe(true);
+
+  it("isValidSyncCode: 12〜256 文字なら任意文字 OK", () => {
+    expect(isValidSyncCode("short")).toBe(false); // 11 以下
+    expect(isValidSyncCode("a".repeat(11))).toBe(false);
+    expect(isValidSyncCode("a".repeat(12))).toBe(true);
+    expect(isValidSyncCode("ポケログの同期合言葉テスト")).toBe(true); // 日本語13字
+    expect(isValidSyncCode("  パスフレーズ 記号!@# 旅  ")).toBe(true);
+    expect(isValidSyncCode("x".repeat(257))).toBe(false);
+    expect(isValidSyncCode("   short   ")).toBe(false); // trim 後 5
+  });
+
+  it("normalizeSyncCode は NFC + 前後 trim（大小は保持）", () => {
+    expect(normalizeSyncCode("  ABc 旅  ")).toBe("ABc 旅");
+    // NFC: 結合文字列と合成済みは同一視
+    expect(normalizeSyncCode("ガ")).toBe(normalizeSyncCode("ガ"));
+  });
+
+  it("syncCodeStrength: 短い/単一文字種は weak", () => {
+    expect(syncCodeStrength("abcdefghijkl")).toBe("weak"); // 12 < 16
+    expect(syncCodeStrength("abcdefghijklmnop")).toBe("weak"); // 16 だが英小のみ
+    expect(syncCodeStrength("Abcdefghijklmno1")).toBe("ok"); // 16 + 多種
+    expect(syncCodeStrength("ポケモン大好き旅パ記録")).toBe("weak"); // 11字
+    expect(syncCodeStrength("あいうえおかきくけこさしすせそたちつてと")).toBe(
+      "ok",
+    ); // 20字（日本語のみでも長ければ可）
+  });
+
+  it("deriveSyncKey は決定的・43 文字 base64url・正規化等価", () => {
+    const k = deriveSyncKey("my passphrase 12+");
+    expect(k).toHaveLength(43);
+    expect(/^[A-Za-z0-9_-]+$/.test(k)).toBe(true);
+    // 決定的（端末間同期の根拠）
+    expect(deriveSyncKey("ポケログ合言葉")).toBe(deriveSyncKey("ポケログ合言葉"));
+    // 前後空白は正規化で吸収＝同一キー
+    expect(deriveSyncKey("  合言葉テスト  ")).toBe(deriveSyncKey("合言葉テスト"));
+    // 異なる入力は異なるキー
+    expect(deriveSyncKey("aaaaaaaaaaaa")).not.toBe(deriveSyncKey("aaaaaaaaaaab"));
+    expect(SYNC_CODE_MIN).toBe(12);
   });
 });
 
@@ -94,6 +130,17 @@ describe("snapshot build/apply", () => {
 });
 
 describe("pull / push", () => {
+  it("リクエスト URL は生合言葉でなく導出キー", async () => {
+    const code = "ポケログの合言葉です";
+    const fetchMock = vi.fn().mockResolvedValueOnce(res(404, {}));
+    vi.stubGlobal("fetch", fetchMock);
+    await pull(code);
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain(`/v1/sync/${deriveSyncKey(code)}`);
+    expect(url).not.toContain(encodeURIComponent(code));
+    expect(url).not.toContain("合言葉");
+  });
+
   it("pull: 404 は null、200 は snapshot、その他は throw", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(res(404, {})));
     expect(await pull("A".repeat(24))).toBeNull();
