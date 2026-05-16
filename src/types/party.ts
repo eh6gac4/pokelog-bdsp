@@ -24,6 +24,7 @@ export interface PartyMember {
   nature: string;
   ability: string;
   heldItem: string;
+  notes: string;
 }
 
 export interface Party {
