@@ -143,13 +143,15 @@ describe("AddPartyMemberModal", () => {
     await user.click(screen.getByRole("button", { name: "努力値ログから" }));
     await user.click(screen.getByRole("button", { name: /ぽち（ポッチャマ）/ }));
 
-    const abilityEl = document.querySelector(
-      "input[list='modal-ability-list']",
-    ) as HTMLInputElement;
+    // ポッチャマ(393) は特性データがあるので <select> で選ぶ。
+    // select は [せいかく, とくせい] の順。とくせいは 2 番目。
+    const abilitySelect = document.querySelectorAll(
+      "select",
+    )[1] as HTMLSelectElement;
     const heldEl = document.querySelector(
       "input[list='modal-held-item-list']",
     ) as HTMLInputElement;
-    await user.type(abilityEl, "げきりゅう");
+    await user.selectOptions(abilitySelect, "げきりゅう");
     await user.type(heldEl, "たべのこし");
     await user.click(screen.getByRole("button", { name: "追加" }));
 
@@ -163,6 +165,44 @@ describe("AddPartyMemberModal", () => {
     expect(data.ability).toBe("げきりゅう");
     expect(data.heldItem).toBe("たべのこし");
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("種族を選ぶとその種族の特性が <select> で選べる", async () => {
+    const user = userEvent.setup();
+    const { onAdd } = renderModal();
+    // ポッチャマ(393) -> げきりゅう / まけんき
+    await user.type(screen.getByPlaceholderText("ポッチャマ"), "ポッチャマ");
+
+    const abilitySelect = document.querySelectorAll(
+      "select",
+    )[1] as HTMLSelectElement;
+    const optionTexts = Array.from(abilitySelect.options).map((o) => o.value);
+    expect(optionTexts).toEqual(["", "げきりゅう", "まけんき"]);
+
+    await user.selectOptions(abilitySelect, "まけんき");
+    await user.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAdd.mock.calls[0][0].ability).toBe("まけんき");
+  });
+
+  it("種族を変えると無効になった特性は未設定に戻る", async () => {
+    const user = userEvent.setup();
+    const { onAdd } = renderModal();
+    const speciesInput = screen.getByPlaceholderText("ポッチャマ");
+
+    await user.type(speciesInput, "ポッチャマ");
+    const abilitySelect = document.querySelectorAll(
+      "select",
+    )[1] as HTMLSelectElement;
+    await user.selectOptions(abilitySelect, "まけんき");
+
+    // ヒコザル(390) は げきりゅう を持たない -> 特性はクリアされる
+    await user.clear(speciesInput);
+    await user.type(speciesInput, "ヒコザル");
+    await user.click(screen.getByRole("button", { name: "追加" }));
+
+    const data = onAdd.mock.calls[0][0];
+    expect(data.speciesId).toBe(390);
+    expect(data.ability).toBe("");
   });
 
   it("種族名を選ぶと図鑑番号が自動補完される", async () => {
