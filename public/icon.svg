@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="ポケログBDSP">
+  <rect width="512" height="512" fill="#0a0a0a"/>
+  <!-- Poké Ball は maskable セーフエリア(中央80%)内に収める: 半径160 < 205 -->
+  <g>
+    <clipPath id="ball">
+      <circle cx="256" cy="256" r="160"/>
+    </clipPath>
+    <g clip-path="url(#ball)">
+      <rect x="96" y="96" width="320" height="160" fill="#e3350d"/>
+      <rect x="96" y="256" width="320" height="160" fill="#f5f5f5"/>
+      <rect x="96" y="242" width="320" height="28" fill="#0a0a0a"/>
+    </g>
+    <circle cx="256" cy="256" r="160" fill="none" stroke="#0a0a0a" stroke-width="14"/>
+    <circle cx="256" cy="256" r="52" fill="#f5f5f5" stroke="#0a0a0a" stroke-width="14"/>
+    <circle cx="256" cy="256" r="22" fill="#0a0a0a"/>
+  </g>
+</svg>
