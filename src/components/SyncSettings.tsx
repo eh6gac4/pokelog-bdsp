@@ -3,6 +3,12 @@
 import { useState } from "react";
 import { useSync } from "@/hooks/useSync";
 import { FIELD_CLASS } from "@/lib/fieldClass";
+import {
+  SYNC_CODE_MIN,
+  isValidSyncCode,
+  normalizeSyncCode,
+  syncCodeStrength,
+} from "@/lib/sync";
 
 const STATUS_LABEL: Record<string, string> = {
   noop: "同期済み（変更なし）",
@@ -34,6 +40,10 @@ export function SyncSettings({ onClose }: Props) {
     }
   };
 
+  const normLen = normalizeSyncCode(input).length;
+  const valid = isValidSyncCode(input);
+  const weak = valid && syncCodeStrength(input) === "weak";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl">
@@ -49,11 +59,11 @@ export function SyncSettings({ onClose }: Props) {
         {sync.code ? (
           <div className="space-y-4 text-sm">
             <div>
-              <span className="text-gray-500">この端末の同期コード</span>
+              <span className="text-gray-500">同期コード（合言葉）</span>
               <div className="mt-1 flex gap-2">
                 <input
                   readOnly
-                  className={`${FIELD_CLASS} flex-1 font-mono`}
+                  className={`${FIELD_CLASS} flex-1`}
                   value={sync.code}
                   onFocus={(e) => e.currentTarget.select()}
                 />
@@ -65,6 +75,9 @@ export function SyncSettings({ onClose }: Props) {
                   {copied ? "コピー済" : "コピー"}
                 </button>
               </div>
+              <p className="text-xs text-gray-400 mt-1">
+                別端末でこの合言葉を入力すると同期されます。
+              </p>
             </div>
 
             {sync.lastStatus && (
@@ -93,44 +106,59 @@ export function SyncSettings({ onClose }: Props) {
           </div>
         ) : (
           <div className="space-y-4 text-sm">
-            <button
-              type="button"
-              onClick={sync.createAndConnect}
-              disabled={sync.busy}
-              className="w-full rounded-lg bg-blue-500 px-4 py-2 text-white font-medium hover:bg-blue-600 disabled:opacity-50"
-            >
-              {sync.busy ? "準備中…" : "同期を有効化（コードを生成）"}
-            </button>
-
-            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+            <div>
               <span className="text-gray-500">
-                別端末のコードを入力して接続
+                同期コード（任意の合言葉でOK）
               </span>
               <p className="text-xs text-gray-400 mt-1">
-                接続するとこの端末のデータはサーバの内容で置き換わります。
+                好きな文字列を設定できます。別端末では
+                <strong>まったく同じ文字列</strong>を入力してください。
+                前後の空白は無視・大文字小文字は区別されます。
               </p>
+              <input
+                className={`${FIELD_CLASS} w-full mt-2`}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={`${SYNC_CODE_MIN}文字以上の合言葉`}
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              {normLen > 0 && normLen < SYNC_CODE_MIN && (
+                <p className="text-xs text-gray-500 mt-1">
+                  あと {SYNC_CODE_MIN - normLen} 文字（最低 {SYNC_CODE_MIN}{" "}
+                  文字）
+                </p>
+              )}
+              {weak && (
+                <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                  ⚠️
+                  推測されやすい合言葉です。他人に知られると全データを閲覧されます。続行は可能ですが、長く複雑な文字列を推奨します。
+                </p>
+              )}
+
               <div className="mt-2 flex gap-2">
-                <input
-                  className={`${FIELD_CLASS} flex-1 font-mono`}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="同期コード"
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                />
                 <button
                   type="button"
                   onClick={() => sync.connect(input)}
-                  disabled={sync.busy || input.trim().length === 0}
+                  disabled={sync.busy || !valid}
+                  className="flex-1 rounded-lg bg-blue-500 px-4 py-2 text-white font-medium hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {sync.busy ? "接続中…" : "この合言葉で同期"}
+                </button>
+                <button
+                  type="button"
+                  onClick={sync.createAndConnect}
+                  disabled={sync.busy}
                   className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
                 >
-                  接続
+                  ランダム生成
                 </button>
               </div>
+
               {sync.lastStatus === "error" && (
                 <p className="text-xs text-red-500 mt-2">
-                  接続に失敗しました。コードと通信状態を確認してください。
+                  接続に失敗しました。合言葉と通信状態を確認してください。
                 </p>
               )}
             </div>
