@@ -1,0 +1,19 @@
+# Cloudflare Pages 用ヘッダ。next.config の headers() は output:"export"
+# では無効なため、ここで付与する。
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# Service Worker は常に最新を取得させる。
+/sw.js
+  Content-Type: application/javascript; charset=utf-8
+  Cache-Control: no-cache, no-store, must-revalidate
+  Content-Security-Policy: default-src 'self'; script-src 'self'
+
+# 拡張子が無い/特殊な静的メタデータの Content-Type を明示。
+/apple-icon
+  Content-Type: image/png
+/manifest.webmanifest
+  Content-Type: application/manifest+json
