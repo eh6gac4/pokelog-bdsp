@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PokemonEntry } from "@/types/pokemon";
+import { FIELD_CLASS } from "@/lib/fieldClass";
 import { EvBar } from "./EvBar";
 
 interface Props {
@@ -37,7 +38,7 @@ export function PokemonCard({ entry, onUpdate, onRemove }: Props) {
             <label className="flex flex-col gap-1">
               <span className="text-gray-500">種族名</span>
               <input
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={entry.speciesName}
                 onChange={(e) => onUpdate(entry.id, { speciesName: e.target.value })}
               />
@@ -45,7 +46,7 @@ export function PokemonCard({ entry, onUpdate, onRemove }: Props) {
             <label className="flex flex-col gap-1">
               <span className="text-gray-500">ニックネーム</span>
               <input
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={entry.nickname}
                 onChange={(e) => onUpdate(entry.id, { nickname: e.target.value })}
               />
@@ -56,7 +57,7 @@ export function PokemonCard({ entry, onUpdate, onRemove }: Props) {
                 type="number"
                 min={1}
                 max={100}
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={entry.level}
                 onChange={(e) => onUpdate(entry.id, { level: Number(e.target.value) })}
               />
@@ -64,7 +65,7 @@ export function PokemonCard({ entry, onUpdate, onRemove }: Props) {
             <label className="flex flex-col gap-1">
               <span className="text-gray-500">せいかく</span>
               <input
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={entry.nature}
                 onChange={(e) => onUpdate(entry.id, { nature: e.target.value })}
               />
@@ -72,7 +73,7 @@ export function PokemonCard({ entry, onUpdate, onRemove }: Props) {
             <label className="flex flex-col gap-1 col-span-2">
               <span className="text-gray-500">捕まえた場所</span>
               <input
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={entry.caughtAt}
                 onChange={(e) => onUpdate(entry.id, { caughtAt: e.target.value })}
               />
@@ -93,7 +94,7 @@ export function PokemonCard({ entry, onUpdate, onRemove }: Props) {
             <span className="text-gray-500">メモ</span>
             <textarea
               rows={2}
-              className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1 resize-none"
+              className={`${FIELD_CLASS} resize-none`}
               value={entry.notes}
               onChange={(e) => onUpdate(entry.id, { notes: e.target.value })}
             />

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { NATURES, PartyMember } from "@/types/party";
+import { FIELD_CLASS } from "@/lib/fieldClass";
 
 interface Props {
   member: PartyMember;
@@ -47,7 +48,7 @@ export function PartyMemberCard({
             <label className="flex flex-col gap-1">
               <span className="text-gray-500">種族名</span>
               <input
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={member.speciesName}
                 onChange={(e) =>
                   onUpdate(member.id, { speciesName: e.target.value })
@@ -57,7 +58,7 @@ export function PartyMemberCard({
             <label className="flex flex-col gap-1">
               <span className="text-gray-500">ニックネーム</span>
               <input
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={member.nickname}
                 onChange={(e) =>
                   onUpdate(member.id, { nickname: e.target.value })
@@ -69,7 +70,7 @@ export function PartyMemberCard({
               <input
                 type="number"
                 min={0}
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={member.speciesId || ""}
                 onChange={(e) =>
                   onUpdate(member.id, { speciesId: Number(e.target.value) })
@@ -82,7 +83,7 @@ export function PartyMemberCard({
                 type="number"
                 min={1}
                 max={100}
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={member.level}
                 onChange={(e) =>
                   onUpdate(member.id, { level: Number(e.target.value) })
@@ -92,7 +93,7 @@ export function PartyMemberCard({
             <label className="flex flex-col gap-1">
               <span className="text-gray-500">せいかく</span>
               <select
-                className="rounded border border-gray-200 dark:border-gray-600 px-2 py-1 bg-white dark:bg-gray-700 dark:text-gray-100"
+                className={FIELD_CLASS}
                 value={member.nature}
                 onChange={(e) =>
                   onUpdate(member.id, { nature: e.target.value })
@@ -110,7 +111,7 @@ export function PartyMemberCard({
               <span className="text-gray-500">とくせい</span>
               <input
                 list={abilityListId}
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={member.ability}
                 onChange={(e) =>
                   onUpdate(member.id, { ability: e.target.value })
@@ -126,7 +127,7 @@ export function PartyMemberCard({
               <span className="text-gray-500">もちもの</span>
               <input
                 list={heldItemListId}
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={member.heldItem}
                 onChange={(e) =>
                   onUpdate(member.id, { heldItem: e.target.value })

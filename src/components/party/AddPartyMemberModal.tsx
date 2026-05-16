@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { SpeciesNameInput } from "@/components/SpeciesNameInput";
 import { NATURES, PartyMember } from "@/types/party";
 import { PokemonEntry } from "@/types/pokemon";
+import { FIELD_CLASS } from "@/lib/fieldClass";
 
 type FormData = Omit<PartyMember, "id">;
 type Tab = "log" | "new";
@@ -38,6 +40,13 @@ export function AddPartyMemberModal({
 
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  const onSpeciesChange = (name: string, id: number | undefined) =>
+    setForm((prev) => ({
+      ...prev,
+      speciesName: name,
+      speciesId: id !== undefined ? id : prev.speciesId,
+    }));
 
   const pickFromLog = (entry: PokemonEntry) => {
     setPickedLogId(entry.id);
@@ -76,7 +85,7 @@ export function AddPartyMemberModal({
           <button
             type="button"
             onClick={() => switchTab("new")}
-            className={`flex-1 rounded-md py-1.5 transition-colors ${
+            className={`flex-1 rounded py-2 transition-colors ${
               tab === "new"
                 ? "bg-white dark:bg-gray-600 shadow-sm font-medium"
                 : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -87,7 +96,7 @@ export function AddPartyMemberModal({
           <button
             type="button"
             onClick={() => switchTab("log")}
-            className={`flex-1 rounded-md py-1.5 transition-colors ${
+            className={`flex-1 rounded py-2 transition-colors ${
               tab === "log"
                 ? "bg-white dark:bg-gray-600 shadow-sm font-medium"
                 : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -104,7 +113,7 @@ export function AddPartyMemberModal({
                 努力値ログにポケモンがいません
               </p>
             ) : (
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              <div className="space-y-2 max-h-48 overflow-y-auto">
                 {logEntries.map((entry) => {
                   const label = entry.nickname
                     ? `${entry.nickname}（${entry.speciesName || "?"}）`
@@ -146,18 +155,18 @@ export function AddPartyMemberModal({
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1">
                 <span className="text-gray-500">種族名 *</span>
-                <input
-                  required
-                  className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                <SpeciesNameInput
                   value={form.speciesName}
-                  onChange={(e) => set("speciesName", e.target.value)}
-                  placeholder="ポッチャマ"
+                  onChange={onSpeciesChange}
+                  required
+                  listId="party-species-list"
+                  className={FIELD_CLASS}
                 />
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-gray-500">ニックネーム</span>
                 <input
-                  className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                  className={FIELD_CLASS}
                   value={form.nickname}
                   onChange={(e) => set("nickname", e.target.value)}
                 />
@@ -167,7 +176,7 @@ export function AddPartyMemberModal({
                 <input
                   type="number"
                   min={0}
-                  className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                  className={FIELD_CLASS}
                   value={form.speciesId || ""}
                   onChange={(e) => set("speciesId", Number(e.target.value))}
                   placeholder="393"
@@ -179,7 +188,7 @@ export function AddPartyMemberModal({
                   type="number"
                   min={1}
                   max={100}
-                  className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                  className={FIELD_CLASS}
                   value={form.level}
                   onChange={(e) => set("level", Number(e.target.value))}
                 />
@@ -187,7 +196,7 @@ export function AddPartyMemberModal({
               <label className="flex flex-col gap-1">
                 <span className="text-gray-500">せいかく</span>
                 <select
-                  className="rounded border border-gray-200 dark:border-gray-600 px-2 py-1 bg-white dark:bg-gray-700 dark:text-gray-100"
+                  className={FIELD_CLASS}
                   value={form.nature}
                   onChange={(e) => set("nature", e.target.value)}
                 >
@@ -203,7 +212,7 @@ export function AddPartyMemberModal({
                 <span className="text-gray-500">とくせい</span>
                 <input
                   list="modal-ability-list"
-                  className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                  className={FIELD_CLASS}
                   value={form.ability}
                   onChange={(e) => set("ability", e.target.value)}
                   placeholder="げきりゅう"
@@ -218,7 +227,7 @@ export function AddPartyMemberModal({
                 <span className="text-gray-500">もちもの</span>
                 <input
                   list="modal-held-item-list"
-                  className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                  className={FIELD_CLASS}
                   value={form.heldItem}
                   onChange={(e) => set("heldItem", e.target.value)}
                   placeholder="きあいのタスキ"
