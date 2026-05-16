@@ -23,28 +23,40 @@ npx wrangler pages deploy out --project-name pokelog-bdsp --branch main
 トークン最小スコープ: Account → Cloudflare Pages: Edit
 （同期 Worker 用に Workers Scripts/KV: Edit も別途必要）。
 
-## main マージで自動デプロイ（GitHub 連携・要ダッシュボード操作）
+## main マージで自動デプロイ（GitHub Actions）
 
-CLI では GitHub 連携を作成できないため、初回のみ Cloudflare ダッシュボードで設定する。
+`.github/workflows/deploy.yml` が `main` への push/マージで
+単体テスト → `npm run build` → `wrangler pages deploy out` を実行する。
+Cloudflare ダッシュボードでの Git 連携は不要。
 
-1. Cloudflare ダッシュボード → **Workers & Pages** → 既存の
-   **`pokelog-bdsp`** プロジェクトを開く（CLI 直デプロイで作成済み）。
-2. **Settings → Builds & deployments → Connect to Git** で
-   GitHub の `eh6gac4/pokelog-bdsp` を認可・接続。
-3. ビルド設定:
-   - Production branch: `main`
-   - Framework preset: `None`（Next.js プリセットは SSR 前提なので使わない）
-   - Build command: `npm run build`
-   - Build output directory: `out`
-   - Node version: `20`（リポジトリ要件 >= 20.9。必要なら環境変数
-     `NODE_VERSION=20` を Pages 側に設定）
-   - 環境変数: 不要（`NEXT_PUBLIC_SYNC_URL` は `next.config.ts` に baked-in）
-4. 保存後、`main` への push/マージで自動的に本番デプロイされる。
-   PR ブランチには自動でプレビュー URL が付く。
+### 必要な GitHub Secrets（初回のみ）
 
-> 注: GitHub 連携を有効化すると、以後は Git 連携が本番デプロイの主経路。
-> CLI 直デプロイ（上記「手動デプロイ」）も併用可能だが、Git 連携と
-> 混在させると最新がどちらか分かりにくくなるため、連携後は原則 Git 経由に統一する。
+リポジトリに以下の 2 つを登録する:
+
+- `CLOUDFLARE_API_TOKEN` — スコープ Account → Cloudflare Pages: Edit
+  （CI 専用に新規発行を推奨。ローカル開発用トークンと分ける）
+- `CLOUDFLARE_ACCOUNT_ID`
+
+`gh` で登録する例（値はチャットに残さない運用）:
+
+```sh
+source ~/.config/pokelog/cloudflare.env
+gh secret set CLOUDFLARE_API_TOKEN  --body "$CLOUDFLARE_API_TOKEN"
+gh secret set CLOUDFLARE_ACCOUNT_ID --body "$CLOUDFLARE_ACCOUNT_ID"
+```
+
+> 推奨: CI 用は専用トークンを発行し、それを Secret に入れる。
+> その後ローカルに残っている旧トークンはローテーション（無効化）する。
+
+### 挙動
+
+- `main` push/マージ → 本番（`https://pokelog-bdsp.pages.dev`）へデプロイ
+- Actions タブから手動実行（`workflow_dispatch`）も可
+- テストが落ちるとデプロイされない（壊れた main の公開防止）
+- `concurrency` で同時実行は最新のみ
+
+> CLI 直デプロイ（上記「手動デプロイ」）も併用可能だが、通常は
+> Actions 経由に統一し、CLI は緊急時のフォールバックとする。
 
 ## オフライン PWA との関係
 
