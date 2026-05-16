@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { SpeciesNameInput } from "@/components/SpeciesNameInput";
+import { AbilitySelect } from "@/components/party/AbilitySelect";
 import { NATURES, PartyMember } from "@/types/party";
 import { PokemonEntry } from "@/types/pokemon";
 import { FIELD_CLASS } from "@/lib/fieldClass";
+import { abilitiesForSpecies } from "@/lib/speciesAbilities";
 
 type FormData = Omit<PartyMember, "id">;
 type Tab = "log" | "new";
@@ -42,11 +44,21 @@ export function AddPartyMemberModal({
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const onSpeciesChange = (name: string, id: number | undefined) =>
-    setForm((prev) => ({
-      ...prev,
-      speciesName: name,
-      speciesId: id !== undefined ? id : prev.speciesId,
-    }));
+    setForm((prev) => {
+      const nextId = id !== undefined ? id : prev.speciesId;
+      const validAbilities = abilitiesForSpecies(nextId);
+      // 種族が変わって今の特性がその種族で取れないなら未設定に戻す。
+      const abilityStillValid =
+        prev.ability === "" ||
+        validAbilities.length === 0 ||
+        validAbilities.includes(prev.ability);
+      return {
+        ...prev,
+        speciesName: name,
+        speciesId: nextId,
+        ability: abilityStillValid ? prev.ability : "",
+      };
+    });
 
   const pickFromLog = (entry: PokemonEntry) => {
     setPickedLogId(entry.id);
@@ -210,18 +222,13 @@ export function AddPartyMemberModal({
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-gray-500">とくせい</span>
-                <input
-                  list="modal-ability-list"
-                  className={FIELD_CLASS}
+                <AbilitySelect
+                  speciesId={form.speciesId}
                   value={form.ability}
-                  onChange={(e) => set("ability", e.target.value)}
-                  placeholder="げきりゅう"
+                  onChange={(a) => set("ability", a)}
+                  fallbackListId="modal-ability-list"
+                  fallbackSuggestions={abilitySuggestions}
                 />
-                <datalist id="modal-ability-list">
-                  {abilitySuggestions.map((a) => (
-                    <option key={a} value={a} />
-                  ))}
-                </datalist>
               </label>
               <label className="flex flex-col gap-1 col-span-2">
                 <span className="text-gray-500">もちもの</span>

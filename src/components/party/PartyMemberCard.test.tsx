@@ -98,11 +98,11 @@ describe("PartyMemberCard", () => {
     expect(onUpdate).toHaveBeenLastCalledWith("m1", { nature: NATURES[0] });
   });
 
-  it("ability/heldItem inputs reference per-member datalists with rendered options", async () => {
+  it("ability is a species-matched select; heldItem keeps per-member datalist", async () => {
     const user = userEvent.setup();
     const { container } = render(
       <PartyMemberCard
-        member={makeMember()}
+        member={makeMember()} // ポッチャマ(393)
         abilitySuggestions={["げきりゅう", "するどいめ"]}
         heldItemSuggestions={["きあいのタスキ", "たべのこし"]}
         onUpdate={() => {}}
@@ -111,17 +111,23 @@ describe("PartyMemberCard", () => {
     );
     await user.click(screen.getByRole("button"));
 
-    const abilityList = container.querySelector("#ability-list-m1");
-    const heldList = container.querySelector("#held-item-list-m1");
-    expect(abilityList).not.toBeNull();
-    expect(heldList).not.toBeNull();
-    expect(abilityList!.querySelectorAll("option")).toHaveLength(2);
-    expect(heldList!.querySelectorAll("option")).toHaveLength(2);
+    // とくせいは種族(393=ポッチャマ)に合わせた <select>。
+    // select は [せいかく, とくせい] の順。
+    const selects = container.querySelectorAll("select");
+    const abilitySelect = selects[1] as HTMLSelectElement;
+    const opts = Array.from(abilitySelect.options).map((o) => o.value);
+    expect(opts).toEqual(["", "げきりゅう", "まけんき"]);
+    // 種族データがあるので fallback datalist は描画されない。
+    expect(container.querySelector("#ability-list-m1")).toBeNull();
 
-    const inputs = container.querySelectorAll("input[list]");
-    const lists = Array.from(inputs).map((i) => i.getAttribute("list"));
-    expect(lists).toContain("ability-list-m1");
-    expect(lists).toContain("held-item-list-m1");
+    // もちものは従来どおり datalist 付き input。
+    const heldList = container.querySelector("#held-item-list-m1");
+    expect(heldList).not.toBeNull();
+    expect(heldList!.querySelectorAll("option")).toHaveLength(2);
+    const heldInput = container.querySelector(
+      "input[list='held-item-list-m1']",
+    );
+    expect(heldInput).not.toBeNull();
   });
 
   it("editing fields fires onUpdate with Number coercion for speciesId/level", async () => {
@@ -155,12 +161,13 @@ describe("PartyMemberCard", () => {
     expect(onUpdate).toHaveBeenLastCalledWith("m1", { level: 8 });
     expect(typeof onUpdate.mock.calls.at(-1)![1].level).toBe("number");
 
-    // ability and heldItem both empty; target by list attr
-    const abilityEl = document.querySelector(
-      "input[list='ability-list-m1']",
-    ) as HTMLInputElement;
-    await user.type(abilityEl, "げ");
-    expect(onUpdate).toHaveBeenLastCalledWith("m1", { ability: "げ" });
+    // ability は種族(393=ポッチャマ)に合わせた <select>。
+    // select は [せいかく, とくせい] の順。
+    const abilitySelect = document.querySelectorAll(
+      "select",
+    )[1] as HTMLSelectElement;
+    await user.selectOptions(abilitySelect, "げきりゅう");
+    expect(onUpdate).toHaveBeenLastCalledWith("m1", { ability: "げきりゅう" });
 
     const heldEl = document.querySelector(
       "input[list='held-item-list-m1']",

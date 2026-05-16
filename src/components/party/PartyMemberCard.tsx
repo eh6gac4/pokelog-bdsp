@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { NATURES, PartyMember } from "@/types/party";
+import { AbilitySelect } from "@/components/party/AbilitySelect";
 import { FIELD_CLASS } from "@/lib/fieldClass";
 
 interface Props {
@@ -109,19 +110,13 @@ export function PartyMemberCard({
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-gray-500">とくせい</span>
-              <input
-                list={abilityListId}
-                className={FIELD_CLASS}
+              <AbilitySelect
+                speciesId={member.speciesId}
                 value={member.ability}
-                onChange={(e) =>
-                  onUpdate(member.id, { ability: e.target.value })
-                }
+                onChange={(a) => onUpdate(member.id, { ability: a })}
+                fallbackListId={abilityListId}
+                fallbackSuggestions={abilitySuggestions}
               />
-              <datalist id={abilityListId}>
-                {abilitySuggestions.map((a) => (
-                  <option key={a} value={a} />
-                ))}
-              </datalist>
             </label>
             <label className="flex flex-col gap-1 col-span-2">
               <span className="text-gray-500">もちもの</span>
