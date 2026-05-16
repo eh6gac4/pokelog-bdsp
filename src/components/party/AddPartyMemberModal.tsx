@@ -27,6 +27,7 @@ const emptyForm = (): FormData => ({
   nature: "",
   ability: "",
   heldItem: "",
+  notes: "",
 });
 
 export function AddPartyMemberModal({
@@ -70,6 +71,7 @@ export function AddPartyMemberModal({
       nature: entry.nature,
       ability: "",
       heldItem: "",
+      notes: entry.notes,
     });
   };
 
@@ -244,6 +246,16 @@ export function AddPartyMemberModal({
                     <option key={i} value={i} />
                   ))}
                 </datalist>
+              </label>
+              <label className="flex flex-col gap-1 col-span-2">
+                <span className="text-gray-500">メモ</span>
+                <textarea
+                  rows={2}
+                  className={`${FIELD_CLASS} resize-none`}
+                  value={form.notes}
+                  onChange={(e) => set("notes", e.target.value)}
+                  placeholder="そだてやに預けた / ともだちにもらった など"
+                />
               </label>
             </div>
 

@@ -129,7 +129,38 @@ describe("AddPartyMemberModal", () => {
     expect(data.nature).toBe("");
     expect(data.ability).toBe("");
     expect(data.heldItem).toBe("");
+    expect(data.notes).toBe("");
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("新規入力: メモを入力すると onAdd に notes として渡る", async () => {
+    const user = userEvent.setup();
+    const { onAdd } = renderModal();
+    await user.type(screen.getByPlaceholderText("ポッチャマ"), "ヒコザル");
+    await user.type(
+      screen.getByPlaceholderText("そだてやに預けた / ともだちにもらった など"),
+      "御三家・初代エース",
+    );
+    await user.click(screen.getByRole("button", { name: "追加" }));
+
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(onAdd.mock.calls[0][0].notes).toBe("御三家・初代エース");
+  });
+
+  it("努力値ログから: ログのメモを引き継ぐ", async () => {
+    const user = userEvent.setup();
+    const entry = makeEntry({ notes: "けいけんちアメで育成" });
+    const { onAdd } = renderModal({ logEntries: [entry] });
+    await user.click(screen.getByRole("button", { name: "努力値ログから" }));
+    await user.click(screen.getByRole("button", { name: /ぽち（ポッチャマ）/ }));
+
+    const memo = screen.getByPlaceholderText(
+      "そだてやに預けた / ともだちにもらった など",
+    ) as HTMLTextAreaElement;
+    expect(memo.value).toBe("けいけんちアメで育成");
+
+    await user.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAdd.mock.calls[0][0].notes).toBe("けいけんちアメで育成");
   });
 
   it("happy path from log: merges copied fields with entered ability/heldItem", async () => {

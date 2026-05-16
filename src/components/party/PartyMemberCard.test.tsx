@@ -13,6 +13,7 @@ function makeMember(partial: Partial<PartyMember> = {}): PartyMember {
     nature: "",
     ability: "",
     heldItem: "",
+    notes: "",
     ...partial,
   };
 }
@@ -174,6 +175,44 @@ describe("PartyMemberCard", () => {
     ) as HTMLInputElement;
     await user.type(heldEl, "た");
     expect(onUpdate).toHaveBeenLastCalledWith("m1", { heldItem: "た" });
+  });
+
+  it("メモ textarea を編集すると onUpdate({ notes }) が呼ばれる", async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <PartyMemberCard
+        member={makeMember({ notes: "" })}
+        abilitySuggestions={[]}
+        heldItemSuggestions={[]}
+        onUpdate={onUpdate}
+        onRemove={() => {}}
+      />,
+    );
+    await user.click(screen.getByRole("button"));
+    const memo = screen.getByText("メモ").parentElement!.querySelector(
+      "textarea",
+    ) as HTMLTextAreaElement;
+    await user.type(memo, "メ");
+    expect(onUpdate).toHaveBeenLastCalledWith("m1", { notes: "メ" });
+  });
+
+  it("notes 欠落の旧データでも textarea は空文字で制御される", async () => {
+    const legacy = makeMember();
+    // localStorage の旧データ相当（notes フィールドなし）を再現
+    delete (legacy as Partial<PartyMember>).notes;
+    const { container } = render(
+      <PartyMemberCard
+        member={legacy}
+        abilitySuggestions={[]}
+        heldItemSuggestions={[]}
+        onUpdate={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+    await userEvent.setup().click(screen.getByRole("button"));
+    const memo = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(memo.value).toBe("");
   });
 
   it("delete calls onRemove(id)", async () => {

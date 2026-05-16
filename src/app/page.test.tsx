@@ -23,6 +23,7 @@ function makeMember(partial: Partial<PartyMember> = {}): PartyMember {
     nature: "",
     ability: "",
     heldItem: "",
+    notes: "",
     ...partial,
   };
 }

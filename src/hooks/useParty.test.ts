@@ -15,6 +15,7 @@ function memberData(
     nature: "がんばりや",
     ability: "しんりょく",
     heldItem: "",
+    notes: "",
     ...overrides,
   };
 }

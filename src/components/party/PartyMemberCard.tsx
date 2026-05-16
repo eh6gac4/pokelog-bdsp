@@ -134,6 +134,17 @@ export function PartyMemberCard({
                 ))}
               </datalist>
             </label>
+            <label className="flex flex-col gap-1 col-span-2">
+              <span className="text-gray-500">メモ</span>
+              <textarea
+                rows={2}
+                className={`${FIELD_CLASS} resize-none`}
+                value={member.notes ?? ""}
+                onChange={(e) =>
+                  onUpdate(member.id, { notes: e.target.value })
+                }
+              />
+            </label>
           </div>
 
           <div className="flex justify-end">
