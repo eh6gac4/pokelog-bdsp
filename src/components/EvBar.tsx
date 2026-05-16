@@ -45,7 +45,7 @@ export function EvBar({ evs, onChange, readonly = false }: Props) {
               max={MAX_SINGLE}
               value={evs[stat]}
               onChange={(e) => onChange?.(stat, Number(e.target.value))}
-              className="w-14 rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-1 py-0.5 text-right tabular-nums text-sm"
+              className="w-14 rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-1 py-1 text-right tabular-nums text-sm"
             />
           )}
         </div>

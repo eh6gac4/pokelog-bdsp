@@ -29,7 +29,9 @@ describe("AddPokemonModal", () => {
     const onClose = vi.fn();
     render(<AddPokemonModal onAdd={onAdd} onClose={onClose} />);
     await user.type(screen.getByPlaceholderText("ポッチャマ"), "ポッチャマ");
-    await user.type(screen.getByPlaceholderText("393"), "393");
+    const idInput = screen.getByPlaceholderText("393");
+    await user.clear(idInput);
+    await user.type(idInput, "393");
     await user.click(screen.getByRole("button", { name: "追加" }));
 
     expect(onAdd).toHaveBeenCalledTimes(1);
@@ -57,6 +59,21 @@ describe("AddPokemonModal", () => {
     await user.type(screen.getByPlaceholderText("ポッチャマ"), "テスト");
     await user.click(screen.getByRole("button", { name: "追加" }));
     expect(onAdd.mock.calls[0][0].speciesId).toBe(12);
+  });
+
+  it("種族名を選ぶと図鑑番号が自動補完される", async () => {
+    const user = userEvent.setup();
+    const onAdd = vi.fn();
+    const onClose = vi.fn();
+    render(<AddPokemonModal onAdd={onAdd} onClose={onClose} />);
+    await user.type(screen.getByPlaceholderText("ポッチャマ"), "フシギダネ");
+    await user.click(screen.getByRole("button", { name: "追加" }));
+
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    const data = onAdd.mock.calls[0][0];
+    expect(data.speciesName).toBe("フシギダネ");
+    expect(data.speciesId).toBe(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("キャンセル calls onClose only, never onAdd", async () => {

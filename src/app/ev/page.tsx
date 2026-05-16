@@ -23,7 +23,7 @@ export default function EvLogPage() {
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight">pokelog-bdsp</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{entries.length} 匹登録中</p>
+          <p className="text-xs text-gray-400 mt-1">{entries.length} 匹登録中</p>
         </div>
         <div className="flex items-center gap-3">
           <Link

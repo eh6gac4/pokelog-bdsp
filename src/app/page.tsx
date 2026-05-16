@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useParty } from "@/hooks/useParty";
 import { usePokemonLog } from "@/hooks/usePokemonLog";
+import { FIELD_CLASS } from "@/lib/fieldClass";
 import {
   GAME_VERSIONS,
   GAME_VERSION_LABELS,
@@ -73,7 +74,7 @@ export default function PartyPage() {
         <div className="mt-2 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold tracking-tight">旅パ</h1>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-400 mt-1">
               {party.members.length} / {PARTY_MAX_MEMBERS} 体
             </p>
           </div>
@@ -90,7 +91,7 @@ export default function PartyPage() {
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-gray-500">パーティ名</span>
           <input
-            className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+            className={FIELD_CLASS}
             value={party.name}
             onChange={(e) => updateParty({ name: e.target.value })}
             placeholder="旅パ名"
@@ -99,7 +100,7 @@ export default function PartyPage() {
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-gray-500">バージョン</span>
           <select
-            className="rounded border border-gray-200 dark:border-gray-600 px-2 py-1 bg-white dark:bg-gray-700 dark:text-gray-100"
+            className={FIELD_CLASS}
             value={party.version}
             onChange={(e) =>
               updateParty({ version: e.target.value as GameVersion })

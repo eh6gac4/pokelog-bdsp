@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocalStorage } from "./useLocalStorage";
+import { randomId } from "@/lib/uuid";
 import {
   Party,
   PartyMember,
@@ -23,7 +24,7 @@ export function useParty() {
   const addMember = (data: Omit<PartyMember, "id">) => {
     setParty((prev) => {
       if (prev.members.length >= PARTY_MAX_MEMBERS) return prev;
-      const member: PartyMember = { ...data, id: crypto.randomUUID() };
+      const member: PartyMember = { ...data, id: randomId() };
       return { ...prev, members: [...prev.members, member] };
     });
   };

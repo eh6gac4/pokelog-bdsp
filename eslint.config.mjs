@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 生成物(.gitignore 済み)。Vitest カバレッジ HTML レポート。
+    "coverage/**",
   ]),
   {
     files: ["**/*.{test,spec}.{ts,tsx}", "vitest.setup.ts", "e2e/**/*.ts"],

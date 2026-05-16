@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocalStorage } from "./useLocalStorage";
+import { randomId } from "@/lib/uuid";
 import { PokemonEntry, emptyEvSpread } from "@/types/pokemon";
 
 const STORAGE_KEY = "pokelog-bdsp-v1";
@@ -17,7 +18,7 @@ export function usePokemonLog() {
     const now = new Date().toISOString();
     const entry: PokemonEntry = {
       ...data,
-      id: crypto.randomUUID(),
+      id: randomId(),
       createdAt: now,
       updatedAt: now,
     };

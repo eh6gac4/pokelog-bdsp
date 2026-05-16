@@ -71,8 +71,8 @@ describe("EvLogPage (/ev) integration", () => {
     // Modal opens.
     expect(screen.getByText("ポケモンを追加")).toBeInTheDocument();
 
+    // 種族名を入力すると図鑑番号(speciesId)は自動補完される。
     await user.type(screen.getByPlaceholderText("ポッチャマ"), "ヒコザル");
-    await user.type(screen.getByPlaceholderText("393"), "390");
     await user.click(screen.getByRole("button", { name: "追加" }));
 
     // Card appears with the species; count updates.

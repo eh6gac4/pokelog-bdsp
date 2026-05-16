@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { SpeciesNameInput } from "@/components/SpeciesNameInput";
+import { FIELD_CLASS } from "@/lib/fieldClass";
 import { PokemonEntry, emptyEvSpread } from "@/types/pokemon";
 
 type FormData = Omit<PokemonEntry, "id" | "createdAt" | "updatedAt">;
@@ -25,6 +27,13 @@ export function AddPokemonModal({ onAdd, onClose }: Props) {
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  const onSpeciesChange = (name: string, id: number | undefined) =>
+    setForm((prev) => ({
+      ...prev,
+      speciesName: name,
+      speciesId: id !== undefined ? id : prev.speciesId,
+    }));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.speciesName.trim()) return;
@@ -40,18 +49,18 @@ export function AddPokemonModal({ onAdd, onClose }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-gray-500">種族名 *</span>
-              <input
-                required
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+              <SpeciesNameInput
                 value={form.speciesName}
-                onChange={(e) => set("speciesName", e.target.value)}
-                placeholder="ポッチャマ"
+                onChange={onSpeciesChange}
+                required
+                listId="ev-species-list"
+                className={FIELD_CLASS}
               />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-gray-500">ニックネーム</span>
               <input
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={form.nickname}
                 onChange={(e) => set("nickname", e.target.value)}
               />
@@ -61,7 +70,7 @@ export function AddPokemonModal({ onAdd, onClose }: Props) {
               <input
                 type="number"
                 min={0}
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={form.speciesId || ""}
                 onChange={(e) => set("speciesId", Number(e.target.value))}
                 placeholder="393"
@@ -73,7 +82,7 @@ export function AddPokemonModal({ onAdd, onClose }: Props) {
                 type="number"
                 min={1}
                 max={100}
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={form.level}
                 onChange={(e) => set("level", Number(e.target.value))}
               />
@@ -81,7 +90,7 @@ export function AddPokemonModal({ onAdd, onClose }: Props) {
             <label className="flex flex-col gap-1">
               <span className="text-gray-500">せいかく</span>
               <input
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={form.nature}
                 onChange={(e) => set("nature", e.target.value)}
                 placeholder="ひかえめ"
@@ -90,7 +99,7 @@ export function AddPokemonModal({ onAdd, onClose }: Props) {
             <label className="flex flex-col gap-1">
               <span className="text-gray-500">捕まえた場所</span>
               <input
-                className="rounded border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1"
+                className={FIELD_CLASS}
                 value={form.caughtAt}
                 onChange={(e) => set("caughtAt", e.target.value)}
                 placeholder="マサゴタウン"

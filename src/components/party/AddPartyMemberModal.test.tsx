@@ -116,7 +116,9 @@ describe("AddPartyMemberModal", () => {
     const user = userEvent.setup();
     const { onAdd, onClose } = renderModal();
     await user.type(screen.getByPlaceholderText("ポッチャマ"), "ヒコザル");
-    await user.type(screen.getByPlaceholderText("393"), "390");
+    const idInput = screen.getByPlaceholderText("393");
+    await user.clear(idInput);
+    await user.type(idInput, "390");
     await user.click(screen.getByRole("button", { name: "追加" }));
 
     expect(onAdd).toHaveBeenCalledTimes(1);
@@ -161,6 +163,34 @@ describe("AddPartyMemberModal", () => {
     expect(data.ability).toBe("げきりゅう");
     expect(data.heldItem).toBe("たべのこし");
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("種族名を選ぶと図鑑番号が自動補完される", async () => {
+    const user = userEvent.setup();
+    const { onAdd, onClose } = renderModal();
+    await user.type(screen.getByPlaceholderText("ポッチャマ"), "ヒコザル");
+    await user.click(screen.getByRole("button", { name: "追加" }));
+
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    const data = onAdd.mock.calls[0][0];
+    expect(data.speciesName).toBe("ヒコザル");
+    expect(data.speciesId).toBe(390);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("未知の種族名は手入力の図鑑番号を保持する(no-clobber)", async () => {
+    const user = userEvent.setup();
+    const { onAdd } = renderModal();
+    await user.type(screen.getByPlaceholderText("ポッチャマ"), "テストモン");
+    const idInput = screen.getByPlaceholderText("393") as HTMLInputElement;
+    await user.clear(idInput);
+    await user.type(idInput, "999");
+    await user.click(screen.getByRole("button", { name: "追加" }));
+
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    const data = onAdd.mock.calls[0][0];
+    expect(data.speciesName).toBe("テストモン");
+    expect(data.speciesId).toBe(999);
   });
 
   it("キャンセル calls onClose in form state", async () => {
