@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { SpeciesNameInput } from "@/components/SpeciesNameInput";
 import { AbilitySelect } from "@/components/party/AbilitySelect";
-import { NATURES, PartyMember } from "@/types/party";
+import { MovesSelect } from "@/components/party/MovesSelect";
+import { NATURES, PartyMember, emptyMoves } from "@/types/party";
 import { PokemonEntry } from "@/types/pokemon";
 import { FIELD_CLASS } from "@/lib/fieldClass";
 import { abilitiesForSpecies } from "@/lib/speciesAbilities";
+import { movesForSpecies } from "@/lib/moves";
 
 type FormData = Omit<PartyMember, "id">;
 type Tab = "log" | "new";
@@ -27,6 +29,7 @@ const emptyForm = (): FormData => ({
   nature: "",
   ability: "",
   heldItem: "",
+  moves: emptyMoves(),
   notes: "",
 });
 
@@ -53,11 +56,20 @@ export function AddPartyMemberModal({
         prev.ability === "" ||
         validAbilities.length === 0 ||
         validAbilities.includes(prev.ability);
+      // 技も同様に、新種族で覚えないスロットは "" にクリア（位置は保持）。
+      const validMoves = movesForSpecies(nextId);
+      const moves =
+        validMoves.length === 0
+          ? prev.moves
+          : prev.moves.map((mv) =>
+              mv === "" || validMoves.includes(mv) ? mv : ""
+            );
       return {
         ...prev,
         speciesName: name,
         speciesId: nextId,
         ability: abilityStillValid ? prev.ability : "",
+        moves,
       };
     });
 
@@ -71,6 +83,8 @@ export function AddPartyMemberModal({
       nature: entry.nature,
       ability: "",
       heldItem: "",
+      // 努力値ログに技ソースは無いので空スロットで開始する。
+      moves: emptyMoves(),
       notes: entry.notes,
     });
   };
@@ -247,6 +261,17 @@ export function AddPartyMemberModal({
                   ))}
                 </datalist>
               </label>
+              <div className="flex flex-col gap-1 col-span-2">
+                <span className="text-gray-500">わざ</span>
+                {/* fallbackSuggestions: 技サジェスト収集は将来課題。今は空。 */}
+                <MovesSelect
+                  speciesId={form.speciesId}
+                  value={form.moves}
+                  onChange={(moves) => set("moves", moves)}
+                  fallbackListId="modal-moves-list"
+                  fallbackSuggestions={[]}
+                />
+              </div>
               <label className="flex flex-col gap-1 col-span-2">
                 <span className="text-gray-500">メモ</span>
                 <textarea

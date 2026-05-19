@@ -15,6 +15,13 @@ export const NATURES = [
 ] as const;
 export type Nature = (typeof NATURES)[number];
 
+export const PARTY_MAX_MOVES = 4;
+
+/** 技スロットの空配列（長さ4）。モーダル既定値とフック正規化で共有する唯一の真実源。 */
+export function emptyMoves(): string[] {
+  return ["", "", "", ""];
+}
+
 export interface PartyMember {
   id: string;
   speciesId: number;
@@ -24,6 +31,8 @@ export interface PartyMember {
   nature: string;
   ability: string;
   heldItem: string;
+  /** 覚えている技（最大4）。ability/nature/heldItem と同じく日本語文字列。空スロットは ""。 */
+  moves: string[];
   notes: string;
 }
 

@@ -1,7 +1,7 @@
 import { render, screen, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PartyMemberCard } from "./PartyMemberCard";
-import { NATURES, PartyMember } from "@/types/party";
+import { NATURES, PartyMember, emptyMoves } from "@/types/party";
 
 function makeMember(partial: Partial<PartyMember> = {}): PartyMember {
   return {
@@ -13,6 +13,7 @@ function makeMember(partial: Partial<PartyMember> = {}): PartyMember {
     nature: "",
     ability: "",
     heldItem: "",
+    moves: emptyMoves(),
     notes: "",
     ...partial,
   };
