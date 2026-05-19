@@ -4,10 +4,13 @@ import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { SyncManager } from "@/components/SyncManager";
 import "./globals.css";
 
-const k8x12s = localFont({
-  src: "./fonts/k8x12S.ttf",
+const pixelMplus12 = localFont({
+  src: [
+    { path: "./fonts/PixelMplus12-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/PixelMplus12-Bold.ttf", weight: "700", style: "normal" },
+  ],
   display: "swap",
-  variable: "--font-k8x12s",
+  variable: "--font-pixelmplus12",
 });
 
 export const metadata: Metadata = {
@@ -37,8 +40,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ja" className={`h-full ${k8x12s.variable}`}>
-      <body className={`${k8x12s.className} min-h-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
+    <html lang="ja" className={`h-full ${pixelMplus12.variable}`}>
+      <body className={`${pixelMplus12.className} min-h-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100`}>
         <ServiceWorkerRegister />
         <SyncManager />
         {children}
