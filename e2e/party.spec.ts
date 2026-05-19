@@ -69,6 +69,53 @@ test("party: add 6 members up to cap then reset", async ({ page }) => {
   await expect(page.getByText("0 / 6 体")).toBeVisible();
 });
 
+test("party: set 4 moves on a member and persist across reload", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByText("メンバー未登録")).toBeVisible({
+    timeout: 15000,
+  });
+
+  await page.getByRole("button", { name: "+ メンバー追加" }).click();
+  await expect(
+    page.getByRole("heading", { name: "メンバーを追加" })
+  ).toBeVisible();
+  await page.getByRole("button", { name: "新規入力" }).click();
+
+  // 種族名を確定すると speciesId が解決され、わざが種族の学習技 select になる。
+  await page.getByPlaceholder("ポッチャマ").fill("ポッチャマ");
+
+  // わざ 1..4 を選択（重複除外により index:1 でも各スロット別の技になる）。
+  const chosen: string[] = [];
+  for (let i = 1; i <= 4; i++) {
+    const sel = page.getByLabel(`わざ${i}`);
+    await expect(sel).toBeVisible();
+    await sel.selectOption({ index: 1 });
+    chosen.push(await sel.inputValue());
+  }
+  expect(new Set(chosen).size).toBe(4); // 4 つとも別の技
+
+  await page.getByRole("button", { name: "追加", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "メンバーを追加" })
+  ).toBeHidden();
+
+  // カードを展開して反映を確認
+  await page.getByRole("button", { name: /ポッチャマ/ }).click();
+  for (let i = 1; i <= 4; i++) {
+    await expect(page.getByLabel(`わざ${i}`)).toHaveValue(chosen[i - 1]);
+  }
+
+  // リロードしても永続している
+  await page.reload();
+  await expect(page.getByText("1 / 6 体")).toBeVisible({ timeout: 15000 });
+  await page.getByRole("button", { name: /ポッチャマ/ }).click();
+  for (let i = 1; i <= 4; i++) {
+    await expect(page.getByLabel(`わざ${i}`)).toHaveValue(chosen[i - 1]);
+  }
+});
+
 test("navigation between party and EV log", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("メンバー未登録")).toBeVisible({

@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import PartyPage from "./page";
-import { Party, PartyMember } from "@/types/party";
+import { Party, PartyMember, emptyMoves } from "@/types/party";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: any) => (
@@ -23,6 +23,7 @@ function makeMember(partial: Partial<PartyMember> = {}): PartyMember {
     nature: "",
     ability: "",
     heldItem: "",
+    moves: emptyMoves(),
     notes: "",
     ...partial,
   };

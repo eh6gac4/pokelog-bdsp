@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { NATURES, PartyMember } from "@/types/party";
 import { AbilitySelect } from "@/components/party/AbilitySelect";
+import { MovesSelect } from "@/components/party/MovesSelect";
 import { FIELD_CLASS } from "@/lib/fieldClass";
 
 interface Props {
@@ -134,6 +135,16 @@ export function PartyMemberCard({
                 ))}
               </datalist>
             </label>
+            <div className="flex flex-col gap-1 col-span-2">
+              <span className="text-gray-500">わざ</span>
+              <MovesSelect
+                speciesId={member.speciesId}
+                value={member.moves}
+                onChange={(moves) => onUpdate(member.id, { moves })}
+                fallbackListId={`moves-list-${member.id}`}
+                fallbackSuggestions={[]}
+              />
+            </div>
             <label className="flex flex-col gap-1 col-span-2">
               <span className="text-gray-500">メモ</span>
               <textarea

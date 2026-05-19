@@ -1,6 +1,16 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useParty } from "./useParty";
-import { emptyParty, type PartyMember } from "@/types/party";
+import { emptyMoves, emptyParty, type PartyMember } from "@/types/party";
+
+// updateMember の種族変更時フィルタを生成データに依存させない。
+vi.mock("@/lib/moves", () => ({
+  movesForSpecies: (id: number) =>
+    id === 393
+      ? ["はたく", "なきごえ", "あわ", "つつく"]
+      : id === 1
+        ? ["たいあたり", "なきごえ", "つるのムチ"]
+        : [],
+}));
 
 const STORAGE_KEY = "pokelog-bdsp-party-v1";
 
@@ -15,6 +25,7 @@ function memberData(
     nature: "がんばりや",
     ability: "しんりょく",
     heldItem: "",
+    moves: emptyMoves(),
     notes: "",
     ...overrides,
   };
@@ -172,6 +183,80 @@ describe("useParty", () => {
     expect(result.current.party.members[0].id).toBe(
       "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
     );
+  });
+
+  it("旧データ(moves 無し)を読むと長さ4の空配列に正規化される", async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        name: "old",
+        version: "bd",
+        members: [
+          {
+            id: "legacy",
+            speciesId: 1,
+            speciesName: "フシギダネ",
+            nickname: "",
+            level: 5,
+            nature: "",
+            ability: "",
+            heldItem: "",
+            notes: "",
+            // moves フィールドが存在しない（旧スキーマ）
+          },
+        ],
+      })
+    );
+
+    const { result } = renderHook(() => useParty());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    expect(result.current.party.members[0].moves).toEqual(["", "", "", ""]);
+  });
+
+  it("addMember は moves を長さ4に正規化して永続する", async () => {
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(
+      "11111111-1111-4111-8111-111111111111"
+    );
+    const { result } = renderHook(() => useParty());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    act(() => {
+      result.current.addMember(
+        memberData({ moves: ["はたく"] as unknown as string[] })
+      );
+    });
+
+    expect(result.current.party.members[0].moves).toEqual([
+      "はたく",
+      "",
+      "",
+      "",
+    ]);
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+    expect(persisted.members[0].moves).toEqual(["はたく", "", "", ""]);
+  });
+
+  it("updateMember で種族が変わると新種族で覚えない技を落とす", async () => {
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    );
+    const { result } = renderHook(() => useParty());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    act(() => {
+      result.current.addMember(
+        memberData({ speciesId: 393, moves: ["はたく", "あわ", "", ""] })
+      );
+    });
+    act(() => {
+      // 1 番(フシギダネ)は「はたく」「あわ」を覚えない → "" にクリア
+      result.current.updateMember("cccccccc-cccc-4ccc-8ccc-cccccccccccc", {
+        speciesId: 1,
+      });
+    });
+
+    expect(result.current.party.members[0].moves).toEqual(["", "", "", ""]);
   });
 
   it("resetParty restores the empty party", async () => {
