@@ -10,6 +10,11 @@ workers_dev = true
 binding = "SYNC_KV"
 id = "dff67e2bd69c4b7e884ff9d6db23b1bb"
 
+# workers-oauth-provider が OAuth クライアント・トークン・グラントを保管する KV。
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "8bb4347f5dbe4e1c93c9b331c093b60a"
+
 # MCP セッション用 Durable Object。McpAgent のセッション状態を保持する
 # だけで、旅パ本体は引き続き SYNC_KV に置く。
 [[durable_objects.bindings]]
@@ -26,5 +31,6 @@ new_sqlite_classes = ["MyMCP"]
 ALLOWED_ORIGIN = "*"
 
 # MCP 認証用シークレットは wrangler secret put で設定する（.toml には書かない）:
-#   wrangler secret put MCP_AUTH_TOKEN   # Bearer token（任意の高エントロピー文字列）
-#   wrangler secret put MCP_SYNC_CODE    # この MCP が読み書きする旅パの同期コード
+#   wrangler secret put MCP_AUTH_PASSPHRASE  # /authorize 同意画面で入力する合言葉（12 文字以上）
+#   wrangler secret put MCP_ADMIN_PASSPHRASE # /admin/clients を叩く時の合言葉（client 作成用）
+#   wrangler secret put MCP_SYNC_CODE        # この MCP が読み書きする旅パの同期コード
