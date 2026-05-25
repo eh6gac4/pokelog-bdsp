@@ -1,12 +1,35 @@
-// ローカル優先のクロスデバイス同期。localStorage が真実の源で、
-// サーバ（Cloudflare Worker）は JSON スナップショット 1 件の保管庫。
-// 同期コード（任意の合言葉）が唯一の認証情報＝共有秘密。
-// 生の合言葉はサーバへ送らず、SHA-256→base64url(43文字) の「転送キー」
-// だけを送る（生合言葉は端末外に出ない）。
+// ローカル優先のクロスデバイス同期（Web 専用層）。
+// localStorage が真実の源で、サーバ（Cloudflare Worker）は JSON
+// スナップショット 1 件の保管庫。
+// 同期コード（任意の合言葉）が唯一の認証情報＝共有秘密。生の合言葉は
+// サーバへ送らず、SHA-256→base64url(43文字) の「転送キー」だけを送る。
+//
+// プロトコル本体（型・鍵導出・HTTP）は sync-core.ts に分離してあり、
+// MCP サーバなどブラウザ外の実行環境からも import される。
 
 import type { Party } from "@/types/party";
 import type { PokemonEntry } from "@/types/pokemon";
-import { sha256Bytes, base64url } from "@/lib/sha256";
+import {
+  pullFrom,
+  pushTo,
+  isValidSyncCode,
+  normalizeSyncCode,
+  type Snapshot,
+  type PushResult,
+} from "@/lib/sync-core";
+
+// 再 export（既存呼び出し側の `import { X } from "@/lib/sync"` を維持）。
+export {
+  SNAPSHOT_SCHEMA,
+  SYNC_CODE_MIN,
+  SYNC_CODE_MAX,
+  normalizeSyncCode,
+  isValidSyncCode,
+  syncCodeStrength,
+  deriveSyncKey,
+  generateSyncCode,
+} from "@/lib/sync-core";
+export type { Snapshot, PushResult } from "@/lib/sync-core";
 
 // useParty / usePokemonLog と同じ localStorage キー。
 export const PARTY_KEY = "pokelog-bdsp-party-v1";
@@ -14,18 +37,10 @@ export const LOG_KEY = "pokelog-bdsp-v1";
 
 // 同期メタ（useLocalStorage を経由しない＝変更イベントを起こさない）。
 export const SYNC_CODE_KEY = "pokelog-bdsp-sync-code-v1";
-export const SYNC_BASE_KEY = "pokelog-bdsp-sync-base-v1"; // 最後に同期したサーバ updatedAt
-export const DIRTY_KEY = "pokelog-bdsp-dirty-v1"; // 最後の同期以降に未送信変更があるか
+export const SYNC_BASE_KEY = "pokelog-bdsp-sync-base-v1";
+export const DIRTY_KEY = "pokelog-bdsp-dirty-v1";
 
 export const CHANGE_EVENT = "pokelog:changed";
-export const SNAPSHOT_SCHEMA = 1;
-
-export interface Snapshot {
-  schema: number;
-  updatedAt: string;
-  party: Party | null;
-  log: PokemonEntry[];
-}
 
 // 遅延解決（テストで env を差し替え可能にするため定数化しない）。
 function baseUrl(): string {
@@ -35,69 +50,6 @@ function baseUrl(): string {
 /** 同期バックエンド URL が設定済みか（未設定なら UI を出さない）。 */
 export function syncConfigured(): boolean {
   return baseUrl().length > 0;
-}
-
-// 紛らわしい文字（0/O/1/I/l）を除いた 31 文字。生成時に使う。
-// 生成物も任意合言葉と同様に転送キーへハッシュされる。
-const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-
-export const SYNC_CODE_MIN = 12;
-export const SYNC_CODE_MAX = 256;
-
-/** 視覚的に同一の入力・前後空白を吸収（大文字小文字は区別＝保持）。 */
-export function normalizeSyncCode(raw: string): string {
-  return raw.normalize("NFC").trim();
-}
-
-/** 任意の合言葉として妥当か（正規化後 12〜256 文字）。 */
-export function isValidSyncCode(code: string): boolean {
-  const n = normalizeSyncCode(code);
-  return n.length >= SYNC_CODE_MIN && n.length <= SYNC_CODE_MAX;
-}
-
-/**
- * 弱い合言葉の非ブロック警告用ヒューリスティック。
- * 長さを主指標にする（日本語のみでも十分長ければ可）。
- * - 20 文字以上: ok
- * - 16 文字未満: weak
- * - 16〜19 文字: 文字種が 2 種以上なら ok（英小のみ等は weak）
- */
-export function syncCodeStrength(code: string): "weak" | "ok" {
-  const n = normalizeSyncCode(code);
-  if (n.length >= 20) return "ok";
-  if (n.length < 16) return "weak";
-  let classes = 0;
-  if (/[a-z]/.test(n)) classes++;
-  if (/[A-Z]/.test(n)) classes++;
-  if (/[0-9]/.test(n)) classes++;
-  if (/[^A-Za-z0-9]/.test(n)) classes++; // 記号・日本語等
-  return classes >= 2 ? "ok" : "weak";
-}
-
-/**
- * 合言葉→転送キー（全端末・全環境で決定的に同一）。
- * SHA-256(正規化済み UTF-8) を base64url 化＝43 文字、URL 安全。
- * 既存 Worker 正規表現 `^[A-Za-z0-9_-]{20,64}$` を満たすため Worker は無改修。
- */
-export function deriveSyncKey(rawCode: string): string {
-  return base64url(sha256Bytes(normalizeSyncCode(rawCode)));
-}
-
-export function generateSyncCode(len = 24): string {
-  const c: Crypto | undefined =
-    typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
-  const out: string[] = [];
-  if (c && typeof c.getRandomValues === "function") {
-    const buf = c.getRandomValues(new Uint8Array(len));
-    for (let i = 0; i < len; i++) {
-      out.push(CODE_ALPHABET[buf[i] % CODE_ALPHABET.length]);
-    }
-  } else {
-    for (let i = 0; i < len; i++) {
-      out.push(CODE_ALPHABET[(Math.random() * CODE_ALPHABET.length) | 0]);
-    }
-  }
-  return out.join("");
 }
 
 function readJSON<T>(key: string, fallback: T): T {
@@ -116,7 +68,7 @@ function readJSON<T>(key: string, fallback: T): T {
  */
 export function buildSnapshot(): Snapshot {
   return {
-    schema: SNAPSHOT_SCHEMA,
+    schema: 1,
     updatedAt: new Date().toISOString(),
     party: readJSON<Party | null>(PARTY_KEY, null),
     log: readJSON<PokemonEntry[]>(LOG_KEY, []),
@@ -129,7 +81,6 @@ export function applySnapshot(snap: Snapshot): void {
     localStorage.setItem(PARTY_KEY, JSON.stringify(snap.party));
   }
   localStorage.setItem(LOG_KEY, JSON.stringify(snap.log ?? []));
-  // サーバ内容を取り込んだのでローカルは「未送信変更なし」状態。
   clearDirty();
 }
 
@@ -205,55 +156,27 @@ export function markChanged(): void {
   }
 }
 
-function endpoint(code: string): string {
-  // 生合言葉ではなく決定的な転送キー（URL 安全 43 文字）を送る。
-  return `${baseUrl()}/v1/sync/${deriveSyncKey(code)}`;
+export function pull(code: string): Promise<Snapshot | null> {
+  return pullFrom(baseUrl(), code);
 }
 
-export async function pull(code: string): Promise<Snapshot | null> {
-  const res = await fetch(endpoint(code), { method: "GET" });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`pull failed: ${res.status}`);
-  return (await res.json()) as Snapshot;
-}
-
-export interface PushResult {
-  ok: boolean;
-  conflict?: boolean;
-  remote?: Snapshot;
-}
-
-export async function push(
+export function push(
   code: string,
   snap: Snapshot,
   base: string | null,
 ): Promise<PushResult> {
-  const url =
-    endpoint(code) + (base ? `?base=${encodeURIComponent(base)}` : "");
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(snap),
-  });
-  if (res.status === 409) {
-    const body = (await res.json().catch(() => ({}))) as {
-      remote?: Snapshot;
-    };
-    return { ok: false, conflict: true, remote: body.remote };
-  }
-  if (!res.ok) throw new Error(`push failed: ${res.status}`);
-  return { ok: true };
+  return pushTo(baseUrl(), code, snap, base);
 }
 
 // --- 同期エンジン ---
 
 export type SyncStatus =
-  | "idle" // 未設定/コード無し
-  | "noop" // 変更なし
-  | "pushed" // ローカル→サーバ反映
-  | "pulled" // サーバ→ローカル反映（呼び出し側でリロード）
-  | "conflict-remote" // 競合: リモート採用（リロード）
-  | "conflict-local" // 競合: ローカル優先（サーバ上書き）
+  | "idle"
+  | "noop"
+  | "pushed"
+  | "pulled"
+  | "conflict-remote"
+  | "conflict-local"
   | "error";
 
 export interface SyncOutcome {
@@ -262,7 +185,6 @@ export interface SyncOutcome {
 }
 
 export interface RunSyncOpts {
-  // true=リモート採用 / false=ローカル優先。未指定時は安全側でリモート採用。
   confirmConflict?: () => boolean;
 }
 
@@ -276,12 +198,11 @@ async function resolveConflict(
 ): Promise<SyncOutcome> {
   const takeRemote = opts.confirmConflict ? opts.confirmConflict() : true;
   if (takeRemote) {
-    applySnapshot(remote); // dirty クリア込み
+    applySnapshot(remote);
     setSyncBase(remote.updatedAt);
     return { status: "conflict-remote" };
   }
   try {
-    // remote.updatedAt を base にして必ず通す（ローカル優先の上書き）。
     const r = await push(code, local, remote.updatedAt);
     if (r.conflict) {
       return { status: "error", error: new Error("conflict_loop") };
@@ -339,7 +260,7 @@ async function doRunSync(opts: RunSyncOpts): Promise<SyncOutcome> {
   }
 
   if (!localChanged) {
-    applySnapshot(remote); // dirty クリア込み
+    applySnapshot(remote);
     setSyncBase(remote.updatedAt);
     return { status: "pulled" };
   }
@@ -365,7 +286,6 @@ export async function connectWithCode(code: string): Promise<SyncOutcome> {
   if (!isValidSyncCode(code)) {
     return { status: "error", error: new Error("invalid_code") };
   }
-  // 表示・コピー時に他端末と一致するよう正規化形で保存（鍵導出も同形）。
   const normalized = normalizeSyncCode(code);
   setSyncCode(normalized);
   let remote: Snapshot | null;
@@ -375,7 +295,7 @@ export async function connectWithCode(code: string): Promise<SyncOutcome> {
     return { status: "error", error };
   }
   if (remote !== null) {
-    applySnapshot(remote); // dirty クリア込み
+    applySnapshot(remote);
     setSyncBase(remote.updatedAt);
     return { status: "pulled" };
   }

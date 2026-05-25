@@ -1,6 +1,8 @@
 name = "pokelog-bdsp-sync"
 main = "src/index.ts"
-compatibility_date = "2024-12-01"
+# nodejs_compat と Durable Object SQLite クラスのため 2025-03-10 以降。
+compatibility_date = "2025-03-10"
+compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 # `wrangler kv namespace create SYNC_KV` で作成した id を埋める。
@@ -8,7 +10,21 @@ workers_dev = true
 binding = "SYNC_KV"
 id = "dff67e2bd69c4b7e884ff9d6db23b1bb"
 
+# MCP セッション用 Durable Object。McpAgent のセッション状態を保持する
+# だけで、旅パ本体は引き続き SYNC_KV に置く。
+[[durable_objects.bindings]]
+name = "MCP_OBJECT"
+class_name = "MyMCP"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MyMCP"]
+
 [vars]
 # 本番では Next アプリのオリジンに絞る（例 "https://pokelog.example.com"）。
 # "*" でも同期コードが唯一の秘密なので機能上は問題ない（cookie 等は不使用）。
 ALLOWED_ORIGIN = "*"
+
+# MCP 認証用シークレットは wrangler secret put で設定する（.toml には書かない）:
+#   wrangler secret put MCP_AUTH_TOKEN   # Bearer token（任意の高エントロピー文字列）
+#   wrangler secret put MCP_SYNC_CODE    # この MCP が読み書きする旅パの同期コード
