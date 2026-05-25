@@ -16,6 +16,7 @@
   "include": [
     "src/**/*.ts",
     "../src/lib/sha256.ts",
+    "../src/lib/sync-core.ts",
     "../src/lib/pokedex.ts",
     "../src/types/party.ts",
     "../src/types/pokemon.ts"
