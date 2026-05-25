@@ -31,6 +31,10 @@ import {
   NATIONAL_DEX,
   lookupSpeciesId,
 } from "../../src/lib/pokedex.ts";
+import {
+  deriveSyncKey,
+  isValidSyncCode,
+} from "../../src/lib/sync-core.ts";
 
 export interface Env {
   SYNC_KV: KVNamespace;
@@ -200,18 +204,22 @@ export class MyMCP extends McpAgent<Env> {
   async init(): Promise<void> {
     const env = this.env;
 
-    const getCode = (): string => {
+    // MCP_SYNC_CODE は生合言葉。Web 側と同じ KV スロットを参照するため、
+    // ブラウザが組み立てる URL と同じ二段で導出する:
+    //   transfer = base64url(sha256(passphrase))      ← deriveSyncKey
+    //   kvKey    = "sync:" + sha256_hex(transfer)     ← kvKeyFor
+    const getKvKey = async (): Promise<string> => {
       const code = env.MCP_SYNC_CODE;
-      if (!code || !CODE_RE.test(code)) {
+      if (!code || !isValidSyncCode(code)) {
         throw new Error(
-          "MCP_SYNC_CODE is not configured (set it via `wrangler secret put`)",
+          "MCP_SYNC_CODE is not configured or invalid (12–256 chars NFC)",
         );
       }
-      return code;
+      return kvKeyFor(deriveSyncKey(code));
     };
 
     const pullSnap = async (): Promise<StoredSnapshot | null> => {
-      const key = await kvKeyFor(getCode());
+      const key = await getKvKey();
       const raw = await env.SYNC_KV.get(key);
       if (raw === null) return null;
       return JSON.parse(raw) as StoredSnapshot;
@@ -224,7 +232,7 @@ export class MyMCP extends McpAgent<Env> {
       snap: StoredSnapshot,
       base: string | null,
     ): Promise<PushOk | PushConflict> => {
-      const key = await kvKeyFor(getCode());
+      const key = await getKvKey();
       if (base !== null) {
         const existing = await env.SYNC_KV.get(key);
         if (existing) {
@@ -456,6 +464,12 @@ function checkMcpAuth(req: Request, env: Env): Response | null {
   if (!env.MCP_AUTH_TOKEN || !env.MCP_SYNC_CODE) {
     return new Response(
       "MCP not configured (set MCP_AUTH_TOKEN and MCP_SYNC_CODE)",
+      { status: 503 },
+    );
+  }
+  if (!isValidSyncCode(env.MCP_SYNC_CODE)) {
+    return new Response(
+      "MCP_SYNC_CODE invalid (must be 12–256 chars after NFC normalization)",
       { status: 503 },
     );
   }
