@@ -1,20 +1,23 @@
-// pokelog-bdsp 同期 Worker + MCP サーバ。
+// pokelog-bdsp 同期 Worker + OAuth で保護した MCP サーバ。
 //
-// 同居しているエンドポイント:
-//   /v1/sync/:code  — 既存。ブラウザのクロスデバイス同期 (GET/PUT)。
-//   /mcp            — Claude.ai 等の MCP クライアント向け Streamable HTTP。
-//   /sse            — レガシー SSE トランスポート（互換用）。
+// エンドポイント:
+//   /v1/sync/:code              — 既存。ブラウザのクロスデバイス同期 (GET/PUT)。OAuth 非経路。
+//   /mcp                        — Claude.ai 等の MCP クライアント向け。OAuth 必須。
+//   /authorize                  — OAuth 同意画面（passphrase 入力）。
+//   /token, /register, /.well-known/oauth-authorization-server
+//                               — workers-oauth-provider が自動提供。
+//   /admin/clients              — OAuth クライアント (=Claude.ai) を手動登録するための一回限り口。
 //
-// /v1/sync は同期コードが唯一の認証情報という従来通りの設計。
-// /mcp は Bearer トークン認証 + Worker secret に固定の sync code を埋める
-// 単一テナント構成（個人利用前提）。
-//
-// 旅パの実体は KV (キー = SHA-256(sync code)) に置く。MCP は Durable
-// Object でセッションを持つが、データは KV を直接 R/W する。
-// よってブラウザ・MCP どちら経由で更新しても同じスナップショットに反映される。
+// 旅パ本体は引き続き SYNC_KV に保管し、MCP もブラウザと同じスロットを参照する
+// （kvKey = sha256(deriveSyncKey(MCP_SYNC_CODE))）。OAuth は「呼び出し元が
+// あなた本人であること」だけを担保し、データ層には介入しない。
 
+import OAuthProvider, {
+  type OAuthHelpers,
+} from "@cloudflare/workers-oauth-provider";
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Hono } from "hono";
 import { z } from "zod";
 
 import {
@@ -38,14 +41,16 @@ import {
 
 export interface Env {
   SYNC_KV: KVNamespace;
+  OAUTH_KV: KVNamespace;
   MCP_OBJECT: DurableObjectNamespace<MyMCP>;
   ALLOWED_ORIGIN?: string;
-  // wrangler secret put で設定する。両方とも未設定なら /mcp は 503 を返す。
-  MCP_AUTH_TOKEN?: string;
-  MCP_SYNC_CODE?: string;
+  // wrangler secret put で設定する。未設定だと /authorize と /admin は 503。
+  MCP_AUTH_PASSPHRASE?: string;  // /authorize 同意ページの入力値
+  MCP_ADMIN_PASSPHRASE?: string; // /admin/clients を叩く時の合言葉
+  MCP_SYNC_CODE?: string;        // 旅パの sync code（生合言葉、12〜256 文字）
 }
 
-// ===== 共有: 既存 sync API と MCP の両方が使うストレージ層 =====
+// ===== 共有 =====
 
 const CODE_RE = /^[A-Za-z0-9_-]{20,64}$/;
 const MAX_BYTES = 256 * 1024;
@@ -75,7 +80,7 @@ function corsHeaders(env: Env): Record<string, string> {
 function json(
   obj: unknown,
   status: number,
-  headers: Record<string, string>,
+  headers: Record<string, string> = {},
 ): Response {
   return new Response(JSON.stringify(obj), {
     status,
@@ -199,7 +204,7 @@ function findMember(party: Party, id: string): PartyMember {
 }
 
 export class MyMCP extends McpAgent<Env> {
-  server = new McpServer({ name: "pokelog-bdsp", version: "0.1.0" });
+  server = new McpServer({ name: "pokelog-bdsp", version: "0.2.0" });
 
   async init(): Promise<void> {
     const env = this.env;
@@ -250,7 +255,6 @@ export class MyMCP extends McpAgent<Env> {
       return { conflict: false };
     };
 
-    /** pull → mutate → push を 409 で 1 回だけリトライ。 */
     const withParty = async (
       mutate: (party: Party) => Party,
     ): Promise<{ party: Party; updatedAt: string }> => {
@@ -458,62 +462,203 @@ export class MyMCP extends McpAgent<Env> {
   }
 }
 
-// ===== Top-level fetch dispatcher =====
+// ===== Default handler (OAuth 同意 + /v1/sync + /admin) =====
 
-function checkMcpAuth(req: Request, env: Env): Response | null {
-  if (!env.MCP_AUTH_TOKEN || !env.MCP_SYNC_CODE) {
-    return new Response(
-      "MCP not configured (set MCP_AUTH_TOKEN and MCP_SYNC_CODE)",
-      { status: 503 },
+type DefaultEnv = Env & { OAUTH_PROVIDER: OAuthHelpers };
+
+const app = new Hono<{ Bindings: DefaultEnv }>();
+
+// 同意ページ
+app.get("/authorize", async (c) => {
+  if (!c.env.MCP_AUTH_PASSPHRASE) {
+    return c.text("MCP_AUTH_PASSPHRASE not configured", 503);
+  }
+  let oauthReqInfo;
+  try {
+    oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+  } catch (e) {
+    return c.text(
+      `Invalid OAuth request: ${e instanceof Error ? e.message : "unknown"}`,
+      400,
     );
   }
-  if (!isValidSyncCode(env.MCP_SYNC_CODE)) {
-    return new Response(
-      "MCP_SYNC_CODE invalid (must be 12–256 chars after NFC normalization)",
-      { status: 503 },
+  const client = await c.env.OAUTH_PROVIDER.lookupClient(oauthReqInfo.clientId);
+  if (!client) {
+    return c.text("Unknown client_id", 400);
+  }
+  const stateJson = btoa(JSON.stringify(oauthReqInfo));
+  return c.html(renderConsentPage({
+    clientName: client.clientName ?? client.clientId,
+    redirectUri: oauthReqInfo.redirectUri,
+    scope: oauthReqInfo.scope,
+    state: stateJson,
+  }));
+});
+
+app.post("/authorize", async (c) => {
+  if (!c.env.MCP_AUTH_PASSPHRASE) {
+    return c.text("MCP_AUTH_PASSPHRASE not configured", 503);
+  }
+  const form = await c.req.raw.formData();
+  const passphrase = String(form.get("passphrase") ?? "");
+  const stateRaw = String(form.get("state") ?? "");
+  if (!stateRaw) return c.text("Missing state", 400);
+
+  // 平文比較。同一文字数で短絡を防ぐため明示的に定数時間比較する。
+  if (!constantTimeEqual(passphrase, c.env.MCP_AUTH_PASSPHRASE)) {
+    return c.html(
+      renderConsentPage({
+        clientName: "pokelog-bdsp",
+        redirectUri: "",
+        scope: [],
+        state: stateRaw,
+        error: "合言葉が違います",
+      }),
+      401,
     );
   }
-  const auth = req.headers.get("Authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  if (token !== env.MCP_AUTH_TOKEN) {
-    return new Response("Unauthorized", { status: 401 });
+
+  let oauthReqInfo;
+  try {
+    oauthReqInfo = JSON.parse(atob(stateRaw));
+  } catch {
+    return c.text("Invalid state", 400);
   }
-  return null;
+
+  const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
+    request: oauthReqInfo,
+    userId: "self",
+    metadata: { label: "pokelog owner" },
+    scope: oauthReqInfo.scope ?? [],
+    props: {},
+  });
+
+  return new Response(null, {
+    status: 302,
+    headers: { Location: redirectTo },
+  });
+});
+
+// 管理: OAuth クライアントの手動登録
+app.post("/admin/clients", async (c) => {
+  if (!c.env.MCP_ADMIN_PASSPHRASE) {
+    return c.text("MCP_ADMIN_PASSPHRASE not configured", 503);
+  }
+  let body: unknown;
+  try {
+    body = await c.req.raw.json();
+  } catch {
+    return c.text("invalid JSON", 400);
+  }
+  const parsed = z.object({
+    passphrase: z.string(),
+    clientName: z.string().min(1),
+    redirectUris: z.array(z.string().url()).min(1),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.format() }, 400);
+  }
+  if (!constantTimeEqual(parsed.data.passphrase, c.env.MCP_ADMIN_PASSPHRASE)) {
+    return c.text("Unauthorized", 401);
+  }
+  const client = await c.env.OAUTH_PROVIDER.createClient({
+    clientName: parsed.data.clientName,
+    redirectUris: parsed.data.redirectUris,
+    tokenEndpointAuthMethod: "client_secret_post",
+  });
+  // 注: clientSecret は平文返却されるのはこの 1 回きり（library 内部はハッシュ保管）。
+  return c.json({
+    clientId: client.clientId,
+    clientSecret: client.clientSecret,
+    redirectUris: client.redirectUris,
+    clientName: client.clientName,
+    note: "clientSecret は今しか取得できない。安全な場所に保存して。",
+  });
+});
+
+// 既存ブラウザ同期 API（OAuth 非経路）
+app.all("/v1/sync/:rest{.*}", async (c) => {
+  const ch = corsHeaders(c.env);
+  if (c.req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: ch });
+  }
+  const m = c.req.path.match(PATH_RE);
+  if (!m) return json({ error: "not_found" }, 404, ch);
+  return handleSync(c.req.raw, c.env, ch, m[1]);
+});
+
+// 案内
+app.get("/", (c) =>
+  c.text(
+    "pokelog-bdsp-sync: /v1/sync/:code (browser sync), /mcp (OAuth-protected MCP)",
+  ),
+);
+
+// 404
+app.all("*", (c) => c.text("Not found", 404));
+
+function constantTimeEqual(a: string, b: string): boolean {
+  const aBytes = new TextEncoder().encode(a);
+  const bBytes = new TextEncoder().encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
+  return diff === 0;
 }
 
-export default {
-  async fetch(
-    req: Request,
-    env: Env,
-    ctx: ExecutionContext,
-  ): Promise<Response> {
-    const url = new URL(req.url);
-    const ch = corsHeaders(env);
+function renderConsentPage(opts: {
+  clientName: string;
+  redirectUri: string;
+  scope: readonly string[];
+  state: string;
+  error?: string;
+}): string {
+  const escape = (s: string) =>
+    s.replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+    );
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>pokelog-bdsp 認可</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 480px; margin: 4rem auto; padding: 0 1rem; line-height: 1.6; }
+  h1 { font-size: 1.25rem; }
+  .client { background: #f5f5f5; padding: 0.75rem 1rem; border-radius: 6px; margin: 1rem 0; }
+  .error { color: #b00; margin: 1rem 0; }
+  label { display: block; margin: 1rem 0 0.25rem; font-weight: 600; }
+  input[type=password] { width: 100%; padding: 0.5rem; font-size: 1rem; box-sizing: border-box; }
+  button { margin-top: 1rem; padding: 0.6rem 1.2rem; font-size: 1rem; cursor: pointer; }
+</style></head><body>
+<h1>旅パ MCP への接続を承認</h1>
+<div class="client">
+  <div><strong>${escape(opts.clientName)}</strong> が旅パの読み書き権限を要求しています。</div>
+  ${opts.redirectUri ? `<div style="font-size:0.85rem;color:#666;margin-top:0.25rem;">callback: ${escape(opts.redirectUri)}</div>` : ""}
+</div>
+${opts.error ? `<div class="error">${escape(opts.error)}</div>` : ""}
+<form method="post" action="/authorize">
+  <label for="passphrase">合言葉 (MCP_AUTH_PASSPHRASE)</label>
+  <input id="passphrase" name="passphrase" type="password" autofocus required>
+  <input type="hidden" name="state" value="${escape(opts.state)}">
+  <button type="submit">承認</button>
+</form>
+</body></html>`;
+}
 
-    if (req.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: ch });
-    }
+// ===== Default export: OAuth で保護された Worker =====
 
-    // MCP (Streamable HTTP)
-    if (url.pathname === "/mcp" || url.pathname.startsWith("/mcp/")) {
-      const unauth = checkMcpAuth(req, env);
-      if (unauth) return unauth;
-      return MyMCP.serve("/mcp").fetch(req, env, ctx);
-    }
-
-    // MCP (legacy SSE トランスポート)
-    if (url.pathname === "/sse" || url.pathname.startsWith("/sse/")) {
-      const unauth = checkMcpAuth(req, env);
-      if (unauth) return unauth;
-      return MyMCP.serveSSE("/sse").fetch(req, env, ctx);
-    }
-
-    // 既存の sync API
-    const m = url.pathname.match(PATH_RE);
-    if (m) {
-      return handleSync(req, env, ch, m[1]);
-    }
-
-    return json({ error: "not_found" }, 404, ch);
-  },
-};
+export default new OAuthProvider({
+  // 公式 demo に倣い any キャスト。MyMCP.serve / Hono app はいずれも
+  // { fetch(req, env, ctx) => Response } を満たすが、ライブラリ側が要求する
+  // 型 (ExportedHandlerWithFetch / WorkerEntrypoint) と微妙に違うため。
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  apiHandler: MyMCP.serve("/mcp") as any,
+  apiRoute: "/mcp",
+  authorizeEndpoint: "/authorize",
+  tokenEndpoint: "/token",
+  // Dynamic Client Registration も有効化。Claude.ai 側が DCR 対応なら自動登録、
+  // しなければ /admin/clients で手動登録する（どちらでも動く）。/register は
+  // 仕様上未認証だが、トークン発行には依然 MCP_AUTH_PASSPHRASE が必要。
+  clientRegistrationEndpoint: "/register",
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  defaultHandler: app as any,
+});
