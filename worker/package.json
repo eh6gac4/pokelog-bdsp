@@ -1,0 +1,24 @@
+{
+  "name": "pokelog-bdsp-sync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker: pokelog-bdsp の同期 API (/v1/sync) と MCP エンドポイント (/mcp) を同居。",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build:dry": "wrangler deploy --dry-run --outdir=dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "agents": "^0.13.0",
+    "zod": "^4.3.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "@types/node": "^20",
+    "typescript": "^5",
+    "wrangler": "^4"
+  }
+}
